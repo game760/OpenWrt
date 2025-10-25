@@ -1,0 +1,21 @@
+name: Delete_Old_Workflows
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 18 * * *
+    - cron: 0 6 * * *
+
+jobs:
+  Clean-Workflows:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+
+    steps:
+      - name: Delete old workflow
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ secrets.DEL_OLD_WORKFLOWS }}
+          keep_minimum_runs: 1
+          retain_days: 0

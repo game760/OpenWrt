@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenWrt 固件下载</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#E2E8F0',     // 主要文本色
+            secondary: '#CBD5E1',   // 次要文本色
+            accent: '#3498DB',      // 亮蓝色强调色
+            dark: '#0F172A',        // 深色背景
+            'dark-light': '#1E293B',// 较浅深色
+            'dark-medium': '#334155'// 中等深色
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+      .transition-custom {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .card-hover {
+        @apply hover:shadow-lg hover:-translate-y-1 transition-all duration-300;
+      }
+      .border-gradient {
+        position: relative;
+        border-radius: 0.75rem;
+        z-index: 0;
+        overflow: hidden;
+      }
+      .border-gradient::before {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        z-index: -1;
+        border-radius: 0.85rem;
+        background: linear-gradient(
+          135deg,
+          #0F172A, #1E293B, #3498DB, #2563EB,
+          #1E293B, #0F172A
+        );
+        background-size: 300% 300%;
+        animation: gradient 8s ease infinite;
+      }
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .text-gradient {
+        background: linear-gradient(
+          90deg,
+          #E2E8F0, #CBD5E1, #3498DB, #CBD5E1,
+          #E2E8F0
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        background-size: 300% 300%;
+        animation: gradient 8s ease infinite;
+      }
+      .button-gradient {
+        background: linear-gradient(
+          90deg,
+          #0F172A, #1E293B, #3498DB, #1E293B,
+          #0F172A
+        );
+        background-size: 300% 300%;
+        animation: gradient 8s ease infinite;
+      }
+      .section-fade-in {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+      }
+      .section-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .pulse-animation {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+      .version-badge {
+        @apply bg-accent/20 text-accent text-sm px-3 py-1 rounded-full font-medium;
+      }
+    }
+  </style>
+</head>
+<body class="font-inter bg-dark text-primary" data-lang="zh">
+  <!-- 导航栏 -->
+  <header class="sticky top-0 z-50 bg-dark/95 backdrop-blur-sm shadow-md transition-all duration-300" id="navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-download text-gradient text-2xl"></i>
+        <h1 class="text-xl font-bold text-gradient" data-i18n="title">OpenWrt 固件下载</h1>
+      </div>
+      <!-- 语言切换按钮 -->
+      <div class="flex items-center space-x-4">
+        <button id="langToggle" class="flex items-center space-x-1 bg-dark-medium hover:bg-accent/20 text-primary hover:text-accent px-3 py-1.5 rounded-md transition-custom">
+          <span data-i18n="langBtn">语言</span>
+          <i class="fa fa-language"></i>
+        </button>
+        <nav class="hidden md:flex items-center space-x-6">
+          <a href="#downloads" class="text-primary font-medium hover:text-accent transition-custom" data-i18n="nav.download">下载中心</a>
+          <a href="https://github.com/coolsnowwolf/lede.git" target="_blank" class="text-secondary hover:text-accent transition-custom github-link" data-i18n="nav.project">项目主页</a>
+          <a href="#features" class="text-secondary hover:text-accent transition-custom" data-i18n="nav.features">固件特性</a>
+          <a href="#guide" class="text-secondary hover:text-accent transition-custom" data-i18n="nav.guide">安装指南</a>
+        </nav>
+        <button class="md:hidden text-primary text-xl" id="menuToggle">
+          <i class="fa fa-bars text-gradient"></i>
+        </button>
+      </div>
+    </div>
+    <!-- 移动端菜单 -->
+    <div class="md:hidden hidden bg-dark-light border-t border-dark-medium" id="mobileMenu">
+      <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+        <a href="#downloads" class="py-2 text-primary font-medium" data-i18n="nav.download">下载中心</a>
+        <a href="https://github.com/coolsnowwolf/lede.git" target="_blank" class="py-2 text-secondary hover:text-accent transition-custom github-link" data-i18n="nav.project">项目主页</a>
+        <a href="#features" class="py-2 text-secondary hover:text-accent transition-custom" data-i18n="nav.features">固件特性</a>
+        <a href="#guide" class="py-2 text-secondary hover:text-accent transition-custom" data-i18n="nav.guide">安装指南</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 英雄区域 -->
+  <section class="relative bg-gradient-to-br from-dark via-dark-light to-dark text-white py-16 md:py-24 overflow-hidden">
+    <!-- 背景装饰 -->
+    <div class="absolute inset-0 opacity-20">
+      <div class="absolute w-64 h-64 rounded-full bg-accent/50 blur-3xl -top-10 -left-10"></div>
+      <div class="absolute w-96 h-96 rounded-full bg-accent/30 blur-3xl bottom-10 right-10"></div>
+    </div>
+    
+    <div class="container mx-auto px-4 relative z-10">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-6 text-shadow leading-tight text-gradient pulse-animation" data-i18n="hero.title">
+          自定制 OpenWrt 固件
+        </h2>
+        <p class="text-[clamp(1rem,2vw,1.25rem)] mb-8 text-secondary" data-i18n="hero.desc">
+          基于 LEDE 源码构建，集成常用插件，稳定可靠，适合 x86_64 设备。
+        </p>
+        <div class="mb-6">
+          <span class="version-badge build-date" data-i18n="currentVersion"></span>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
+          <a href="#downloads" class="button-gradient hover:opacity-90 text-white font-medium py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-custom flex items-center justify-center group">
+            <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+            <span data-i18n="hero.downloadBtn">立即下载</span>
+          </a>
+          <a href="https://github.com/coolsnowwolf/lede.git" target="_blank" class="bg-white/10 backdrop-blur-sm border-2 border-white/10 text-white hover:bg-white/20 font-medium py-3 px-8 rounded-lg transition-custom flex items-center justify-center github-link group">
+            <i class="fa fa-github mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+            <span data-i18n="hero.sourceBtn">查看源码</span>
+          </a>
+        </div>
+        
+        <!-- 滚动提示 -->
+        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce hidden md:block">
+          <i class="fa fa-angle-down text-2xl text-secondary"></i>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 固件信息 -->
+  <section id="features" class="py-16 bg-dark-light section-fade-in">
+    <div class="container mx-auto px-4">
+      <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-center mb-4 text-gradient" data-i18n="features.title">固件特性</h2>
+      <p class="text-center text-secondary mb-12 max-w-2xl mx-auto" data-i18n="features.subtitle">精心打造的固件，满足您的网络需求</p>
+      
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- 特性卡片 1 -->
+        <div class="bg-dark rounded-xl p-6 shadow-sm card-hover border-gradient">
+          <div class="w-14 h-14 bg-accent/10 rounded-lg flex items-center justify-center mb-5">
+            <i class="fa fa-puzzle-piece text-accent text-2xl"></i>
+          </div>
+          <h3 class="text-xl font-semibold mb-3 text-primary" data-i18n="features.plugin.title">常用插件集成</h3>
+          <ul class="space-y-2 text-secondary">
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.clash">openclash</span></li>
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.passwall">passwall</span></li>
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.reboot">定时重启</span></li>
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.kms">KMS服务器</span></li>
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.timeCtrl">上网时间控制</span></li>
+          </ul>
+        </div>
+        
+        <!-- 特性卡片 2 -->
+        <div class="bg-dark rounded-xl p-6 shadow-sm card-hover border-gradient">
+          <div class="w-14 h-14 bg-accent/10 rounded-lg flex items-center justify-center mb-5">
+            <i class="fa fa-refresh text-accent text-2xl"></i>
+          </div>
+          <h3 class="text-xl font-semibold mb-3 text-primary" data-i18n="features.update.title">自动更新</h3>
+          <p class="text-secondary" data-i18n="features.update.desc">每天自动构建最新版本，基于 LEDE 源码持续更新，确保安全性和稳定性。</p>
+          <div class="mt-4 text-sm text-secondary bg-dark-medium p-3 rounded-lg">
+            <p><i class="fa fa-clock-o mr-1 text-accent"></i> <span data-i18n="features.update.time">构建时间: UTC 3:00 和 14:00</span></p>
+          </div>
+        </div>
+        
+        <!-- 特性卡片 3 -->
+        <div class="bg-dark rounded-xl p-6 shadow-sm card-hover border-gradient">
+          <div class="w-14 h-14 bg-accent/10 rounded-lg flex items-center justify-center mb-5">
+            <i class="fa fa-server text-accent text-2xl"></i>
+          </div>
+          <h3 class="text-xl font-semibold mb-3 text-primary" data-i18n="features.tools.title">网络工具</h3>
+          <ul class="space-y-2 text-secondary">
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i>ipv6</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 下载区域 -->
+  <section id="downloads" class="py-16 bg-dark section-fade-in">
+    <div class="container mx-auto px-4">
+      <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-center mb-4 text-gradient" data-i18n="download.title">下载中心</h2>
+      <p class="text-center text-secondary mb-12 max-w-2xl mx-auto" data-i18n="download.desc">选择适合您需求的固件版本，所有版本均经过自动化构建和基本测试</p>
+      
+      <div class="max-w-4xl mx-auto">
+        <!-- 下载标签页 -->
+        <div class="border-b border-dark-medium mb-6">
+          <div class="flex flex-wrap">
+            <button class="download-tab py-3 px-6 font-medium text-accent border-b-2 border-accent" data-tab="clash">
+              <i class="fa fa-shield mr-2"></i> <span data-i18n="download.clash">OpenClash 版</span>
+            </button>
+            <button class="download-tab py-3 px-6 font-medium text-secondary hover:text-accent" data-tab="passwall">
+              <i class="fa fa-road mr-2"></i> <span data-i18n="download.passwall">PassWall 版</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- OpenClash 版本下载 -->
+        <div class="download-content" id="clash-content">
+          <div class="bg-dark-light rounded-xl shadow-md overflow-hidden border-gradient">
+            <div class="p-6 border-b border-dark-medium">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-semibold text-primary" data-i18n="download.clashTitle">OpenWrt-x86_64-OpenClash 最新版</h3>
+                  <div class="mt-2">
+                     <span class="version-badge build-date" data-i18n="currentVersion"></span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <a href="https://github.com/game760/openwrt/releases/download/openclash/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="button-gradient hover:opacity-90 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.downloadBtn">主用下载</span>
+                  </a>
+                  <a href="https://gh-proxy.com/https://github.com/game760/openwrt/releases/download/openclash/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="bg-dark-medium hover:bg-accent/30 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.backupBtn">备用下载</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <div class="p-6">
+              <h4 class="font-medium mb-3 text-primary" data-i18n="download.components">包含组件:</h4>
+              <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">OpenClash</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.reboot">定时重启</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.kms">KMS服务器</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.timeCtrl">上网时间控制</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">IPv6</span>
+              </div>
+              
+              <div class="bg-dark p-4 rounded-lg border border-dark-medium">
+                <h4 class="font-medium mb-2 flex items-center" data-i18n="download.note">
+                  <i class="fa fa-info-circle text-accent mr-2"></i> 版本说明
+                </h4>
+                <p class="text-sm text-secondary" data-i18n="download.clashNote">此版本集成 OpenClash 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，支持 IPv6。</p>
+                <p class="text-xs text-secondary mt-2" data-i18n="download.fileTip">提示：国外地区使用主用地址下载；中国地区使用备用地址下载。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- PassWall 版本下载 -->
+        <div class="download-content hidden" id="passwall-content">
+          <div class="bg-dark-light rounded-xl shadow-md overflow-hidden border-gradient">
+            <div class="p-6 border-b border-dark-medium">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-semibold text-primary" data-i18n="download.passwallTitle">OpenWrt-x86_64-PassWall 最新版</h3>
+                   <div class="mt-2">
+                    <span class="version-badge build-date" data-i18n="currentVersion"></span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <a href="https://github.com/game760/openwrt/releases/download/passwall/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="button-gradient hover:opacity-90 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.downloadBtn">主用下载</span>
+                  </a>
+                  <a href="https://gh-proxy.com/https://github.com/game760/openwrt/releases/download/passwall/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="bg-dark-medium hover:bg-accent/30 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.backupBtn">备用下载</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <div class="p-6">
+              <h4 class="font-medium mb-3 text-primary" data-i18n="download.components">包含组件:</h4>
+              <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">PassWall</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.reboot">定时重启</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.kms">KMS服务器</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.timeCtrl">上网时间控制</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">IPv6</span>
+              </div>
+              
+              <div class="bg-dark p-4 rounded-lg border border-dark-medium">
+                <h4 class="font-medium mb-2 flex items-center" data-i18n="download.note">
+                  <i class="fa fa-info-circle text-accent mr-2"></i> 版本说明
+                </h4>
+                <p class="text-sm text-secondary" data-i18n="download.passwallNote">此版本集成 PassWall 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。</p>
+                <p class="text-xs text-secondary mt-2" data-i18n="download.fileTip">提示：国外地区使用主用地址下载；中国地区使用备用地址下载。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 安装指南 -->
+  <section id="guide" class="py-16 bg-dark-light section-fade-in">
+    <div class="container mx-auto px-4">
+      <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-center mb-4 text-gradient" data-i18n="guide.title">安装指南</h2>
+      <p class="text-center text-secondary mb-12 max-w-2xl mx-auto" data-i18n="guide.subtitle">按照以下步骤轻松安装固件</p>
+      
+      <div class="max-w-3xl mx-auto">
+        <div class="bg-dark rounded-xl p-6 md:p-8 mb-8 border-gradient relative overflow-hidden">
+          <!-- 装饰元素 -->
+          <div class="absolute -right-10 -top-10 w-24 h-24 bg-accent/5 rounded-full"></div>
+          
+          <h3 class="text-xl font-semibold mb-6 flex items-center" data-i18n="guide.step1.title">
+            <span class="w-8 h-8 bg-accent text-white rounded-full flex items-center justify-center mr-3">1</span>
+            准备工作
+          </h3>
+          <ul class="space-y-3 text-secondary pl-11">
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step1.item1">确保您的设备是 x86_64 架构的兼容设备</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step1.item2">下载适合的固件版本（OpenClash 或 PassWall）</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step1.item3">准备一个至少 1GB 的 USB 闪存盘或其他存储介质</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="bg-dark rounded-xl p-6 md:p-8 mb-8 border-gradient relative overflow-hidden">
+          <div class="absolute -right-10 -top-10 w-24 h-24 bg-accent/5 rounded-full"></div>
+          
+          <h3 class="text-xl font-semibold mb-6 flex items-center" data-i18n="guide.step2.title">
+            <span class="w-8 h-8 bg-accent text-white rounded-full flex items-center justify-center mr-3">2</span>
+            写入固件
+          </h3>
+          <ul class="space-y-3 text-secondary pl-11">
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step2.item1">使用 Etcher 或 Rufus 等工具将下载的固件写入存储介质</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step2.item2">确保写入模式正确，选择 DD 模式（如果使用 Rufus）</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="bg-dark rounded-xl p-6 md:p-8 border-gradient relative overflow-hidden">
+          <div class="absolute -right-10 -top-10 w-24 h-24 bg-accent/5 rounded-full"></div>
+          
+          <h3 class="text-xl font-semibold mb-6 flex items-center" data-i18n="guide.step3.title">
+            <span class="w-8 h-8 bg-accent text-white rounded-full flex items-center justify-center mr-3">3</span>
+            安装步骤
+          </h3>
+          <ul class="space-y-3 text-secondary pl-11">
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step3.item1">将写入固件的存储介质插入目标设备并启动</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step3.item2">进入 BIOS/UEFI 设置，设置从 USB 设备启动</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step3.item3">启动后按照提示完成安装，可选择安装到硬盘或直接从 USB 运行</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step3.item4">安装完成后，设备将自动重启。默认 IP 地址为 192.168.1.1</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
+              <span data-i18n="guide.step3.item5">默认登录密码 password</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer class="bg-dark py-12">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="mb-6 md:mb-0">
+          <div class="flex items-center space-x-2 mb-3">
+            <i class="fa fa-download text-gradient text-xl"></i>
+            <h2 class="text-xl font-bold text-gradient" data-i18n="footer.title">OpenWrt 固件</h2>
+          </div>
+          <p class="text-secondary text-sm max-w-md" data-i18n="footer.desc">
+            基于 LEDE 源码构建的定制化 OpenWrt 固件，集成常用插件，适合 x86_64 设备。
+          </p>
+        </div>
+        
+        <div class="flex flex-col items-center md:items-end">
+          <div class="flex space-x-4 mb-4">
+            <a href="https://github.com/game760/OpenWrt" target="_blank" class="w-10 h-10 rounded-full bg-dark-medium flex items-center justify-center hover:bg-accent transition-custom github-link group">
+              <i class="fa fa-github group-hover:scale-110 transition-transform"></i>
+            </a>
+            <a href="#" class="w-10 h-10 rounded-full bg-dark-medium flex items-center justify-center hover:bg-accent transition-custom group">
+              <i class="fa fa-question-circle group-hover:scale-110 transition-transform"></i>
+            </a>
+          </div>
+          <p class="text-secondary text-sm" data-i18n="footer.copyright">
+            copyright 2023 OpenWrt 项目. 保留所有权利.
+          </p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // 多语言配置
+    const i18n = {
+      zh: {
+        title: "OpenWrt 固件下载",
+        langBtn: "English",
+        currentVersion: "当前版本: ",
+        nav: {
+          download: "下载中心",
+          project: "项目主页",
+          features: "固件特性",
+          guide: "安装指南"
+        },
+        hero: {
+          title: "自定制 OpenWrt 固件",
+          desc: "基于 LEDE 源码构建，集成常用插件，稳定可靠，适合 x86_64 设备。",
+          downloadBtn: "立即下载",
+          sourceBtn: "查看源码"
+        },
+        features: {
+          title: "固件特性",
+          subtitle: "精心打造的固件，满足您的网络需求",
+          plugin: {
+            title: "常用插件集成",
+            clash: "openclash",
+            passwall: "passwall",
+            reboot: "定时重启",
+            kms: "KMS服务器",
+            timeCtrl: "上网时间控制"
+          },
+          update: {
+            title: "自动更新",
+            desc: "每天自动构建最新版本，基于 LEDE 源码持续更新，确保安全性和稳定性。",
+            time: "构建时间: UTC 3:00 和 14:00"
+          },
+          tools: {
+            title: "网络工具"
+          }
+        },
+        download: {
+          title: "下载中心",
+          desc: "选择适合您需求的固件版本，所有版本均经过自动化构建和基本测试",
+          clash: "OpenClash 版",
+          passwall: "PassWall 版",
+          clashTitle: "OpenWrt-x86_64-OpenClash 最新版",
+          passwallTitle: "OpenWrt-x86_64-PassWall 最新版",
+          downloadBtn: "主用下载",
+          backupBtn: "备用下载",
+          components: "包含组件:",
+          note: "版本说明",
+          fileTip: "国外地区使用主用地址下载；中国地区使用备用地址下载。",
+          clashNote: "此版本集成 OpenClash 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，支持 IPv6。",
+          passwallNote: "此版本集成 PassWall 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。"
+        },
+        guide: {
+          title: "安装指南",
+          subtitle: "按照以下步骤轻松安装固件",
+          step1: {
+            title: "准备工作",
+            item1: "确保您的设备是 x86_64 架构的兼容设备",
+            item2: "下载适合的固件版本（OpenClash 或 PassWall）",
+            item3: "准备一个至少 1GB 的 USB 闪存盘或其他存储介质"
+          },
+          step2: {
+            title: "写入固件",
+            item1: "使用 Etcher 或 Rufus 等工具将下载的固件写入存储介质",
+            item2: "确保写入模式正确，选择 DD 模式（如果使用 Rufus）"
+          },
+          step3: {
+            title: "安装步骤",
+            item1: "将写入固件的存储介质插入目标设备并启动",
+            item2: "进入 BIOS/UEFI 设置，设置从 USB 设备启动",
+            item3: "启动后按照提示完成安装，可选择安装到硬盘或直接从 USB 运行",
+            item4: "安装完成后，设备将自动重启。默认 IP 地址为 192.168.1.1",
+            item5: "默认登录密码 password"
+          }
+        },
+        footer: {
+          title: "OpenWrt 固件",
+          desc: "基于 LEDE 源码构建的定制化 OpenWrt 固件，集成常用插件，适合 x86_64 设备。",
+          copyright: "copyright 2023 OpenWrt 项目. 保留所有权利."
+        }
+      },
+      en: {
+        title: "OpenWrt Firmware Download",
+        langBtn: "Chinese",
+        currentVersion: "Current Version: ",
+        nav: {
+          download: "Download Center",
+          project: "Source Code",
+          features: "Firmware Features",
+          guide: "Installation Guide"
+        },
+        hero: {
+          title: "Customized OpenWrt Firmware",
+          desc: "Built from LEDE source code, integrated with common plugins, stable and reliable for x86_64 devices.",
+          downloadBtn: "Download Now",
+          sourceBtn: "Source Code"
+        },
+        features: {
+          title: "Firmware Features",
+          subtitle: "Carefully crafted firmware to meet your network needs",
+          plugin: {
+            title: "Common Plugins Integrated",
+            clash: "openclash",
+            passwall: "passwall",
+            reboot: "Scheduled Reboot",
+            kms: "KMS Server",
+            timeCtrl: "Internet Time Control"
+          },
+          update: {
+            title: "Auto Update",
+            desc: "Automatically build the latest version every day, continuously updated based on LEDE source code to ensure security and stability.",
+            time: "Build Time: UTC 19:00 and 6:00"
+          },
+          tools: {
+            title: "Network Tools"
+          }
+        },
+        download: {
+          title: "Download Center",
+          desc: "Select the firmware version that suits your needs. All versions have undergone automated builds and basic testing.",
+          clash: "OpenClash Version",
+          passwall: "PassWall Version",
+          clashTitle: "OpenWrt-x86_64-OpenClash Latest Version",
+          passwallTitle: "OpenWrt-x86_64-PassWall Latest Version",
+          downloadBtn: "Main Download",
+          backupBtn: "Backup Download",
+          components: "Included Components:",
+          note: "Version Note",
+          fileTip: "Note: Use the primary address for downloading in overseas regions; use the backup address for downloading in China.",
+          clashNote: "This version integrates the OpenClash plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, supporting IPv6.",
+          passwallNote: "This version integrates the PassWall plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, suitable for x86_64 architecture devices."
+        },
+        guide: {
+          title: "Installation Guide",
+          subtitle: "Easily install the firmware with the following steps",
+          step1: {
+            title: "Preparation",
+            item1: "Ensure your device is a compatible x86_64 architecture device",
+            item2: "Download the suitable firmware version (OpenClash or PassWall)",
+            item3: "Prepare a USB flash drive or other storage medium of at least 1GB"
+          },
+          step2: {
+            title: "Write Firmware",
+            item1: "Use tools like Etcher or Rufus to write the downloaded firmware to the storage medium",
+            item2: "Ensure the writing mode is correct, select DD mode (if using Rufus)"
+          },
+          step3: {
+            title: "Installation Steps",
+            item1: "Insert the storage medium with the written firmware into the target device and start it",
+            item2: "Enter BIOS/UEFI settings and set to boot from the USB device",
+            item3: "Follow the prompts to complete the installation after booting; you can choose to install to the hard drive or run directly from USB",
+            item4: "After installation, the device will restart automatically, and the default IP address is 192.168.1.1",
+            item5: "Default login password: password"
+          }
+        },
+        footer: {
+          title: "OpenWrt Firmware",
+          desc: "Customized OpenWrt firmware built from LEDE source code, integrated with common plugins, suitable for x86_64 devices.",
+          copyright: "copyright 2023 OpenWrt Project. All Rights Reserved."
+        }
+      }
+    };
+
+    // 初始化日期显示
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const buildDate = `${year}-${month}-${day}`;
+    document.querySelectorAll('.build-date').forEach(el => {
+      const lang = document.body.getAttribute('data-lang');
+      el.textContent = `${i18n[lang].currentVersion}${buildDate}`;
+    });
+
+    // 语言切换功能
+    const langToggle = document.getElementById('langToggle');
+    const savedLang = localStorage.getItem('openwrtLang') || 'zh';
+    
+    // 初始化语言
+    updatePageLang(savedLang);
+    
+    // 语言切换事件
+    langToggle.addEventListener('click', () => {
+      const currentLang = document.body.getAttribute('data-lang');
+      const newLang = currentLang === 'zh' ? 'en' : 'zh';
+      localStorage.setItem('openwrtLang', newLang);
+      updatePageLang(newLang);
+    });
+    
+    // 更新页面语言
+    function updatePageLang(lang) {
+      document.body.setAttribute('data-lang', lang);
+      
+      // 更新所有带data-i18n属性的元素
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const text = getI18nValue(key, lang);
+        if (text) {
+          el.textContent = text;
+        }
+      });
+      
+      // 更新日期显示
+      document.querySelectorAll('.build-date').forEach(el => {
+        el.textContent = `${i18n[lang].currentVersion}${buildDate}`;
+      });
+      
+      // 更新页面标题
+      document.title = i18n[lang].title;
+    }
+    
+    // 获取嵌套的i18n值
+    function getI18nValue(key, lang) {
+      return key.split('.').reduce((obj, k) => obj && obj[k], i18n[lang]);
+    }
+
+    // 移动端菜单切换
+    const menuToggle = document.getElementById('menuToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+    
+    menuToggle.addEventListener('click', () => {
+      mobileMenu.classList.toggle('hidden');
+      // 切换图标
+      const icon = menuToggle.querySelector('i');
+      if (icon.classList.contains('fa-bars')) {
+        icon.classList.remove('fa-bars');
+        icon.classList.add('fa-times');
+      } else {
+        icon.classList.remove('fa-times');
+        icon.classList.add('fa-bars');
+      }
+    });
+    
+    // 点击移动端菜单链接后自动收起菜单
+    document.querySelectorAll('#mobileMenu a').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.add('hidden');
+        const icon = menuToggle.querySelector('i');
+        icon.classList.remove('fa-times');
+        icon.classList.add('fa-bars');
+      });
+    });
+
+    // 下载标签页切换
+    const downloadTabs = document.querySelectorAll('.download-tab');
+    const downloadContents = document.querySelectorAll('.download-content');
+    
+    downloadTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.getAttribute('data-tab');
+        
+        // 更新标签样式
+        downloadTabs.forEach(t => {
+          t.classList.remove('text-accent', 'border-b-2', 'border-accent');
+          t.classList.add('text-secondary');
+        });
+        tab.classList.remove('text-secondary');
+        tab.classList.add('text-accent', 'border-b-2', 'border-accent');
+        
+        // 更新内容显示
+        downloadContents.forEach(content => {
+          content.classList.add('hidden');
+        });
+        document.getElementById(`${targetTab}-content`).classList.remove('hidden');
+      });
+    });
+
+    // 滚动动画
+    const fadeSections = document.querySelectorAll('.section-fade-in');
+    
+    // 检测元素是否在视图内
+    function isInViewport(el) {
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.top <= window.innerHeight * 0.8 &&
+        rect.bottom >= 0
+      );
+    }
+    
+    // 处理滚动事件
+    function handleScroll() {
+      // 处理滚动动画
+      fadeSections.forEach(section => {
+        if (isInViewport(section) && !section.classList.contains('section-visible')) {
+          section.classList.add('section-visible');
+        }
+      });
+      
+      // 导航栏滚动样式变化
+      const navbar = document.getElementById('navbar');
+      if (window.scrollY > 50) {
+        navbar.classList.add('py-2', 'shadow-lg');
+        navbar.classList.remove('py-3');
+      } else {
+        navbar.classList.add('py-3');
+        navbar.classList.remove('py-2', 'shadow-lg');
+      }
+    }
+    
+    // 平滑滚动
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href');
+        if (targetId === '#') return;
+        
+        const targetElement = document.querySelector(targetId);
+        if (targetElement) {
+          window.scrollTo({
+            top: targetElement.offsetTop - 80,
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+    
+    // GitHub链接加载状态
+    document.querySelectorAll('.github-link').forEach(link => {
+      link.addEventListener('click', function() {
+        const originalContent = this.innerHTML;
+        this.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> Loading...';
+        this.style.pointerEvents = 'none';
+        
+        // 3秒后恢复原状（防止链接失效时状态不变）
+        setTimeout(() => {
+          this.innerHTML = originalContent;
+          this.style.pointerEvents = 'auto';
+        }, 3000);
+      });
+    });
+    
+    // 初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      handleScroll();
+    });
+    
+    // 监听滚动事件
+    window.addEventListener('scroll', handleScroll);
+  </script>
+</body>
+</html>
