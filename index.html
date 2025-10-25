@@ -105,23 +105,35 @@
       .version-badge {
         @apply bg-accent/20 text-accent text-sm px-3 py-1 rounded-full font-medium;
       }
+      /* 浮动语言按钮样式 */
+      .lang-btn {
+        @apply px-3 py-1.5 rounded-md transition-custom text-sm font-medium;
+      }
+      .lang-btn-active {
+        @apply bg-accent text-white;
+      }
+      .lang-btn-inactive {
+        @apply bg-dark-medium text-primary hover:bg-accent/30 hover:text-white;
+      }
     }
   </style>
 </head>
 <body class="font-inter bg-dark text-primary" data-lang="zh">
+  <!-- 浮动语言按钮（右上角固定） -->
+  <div class="fixed top-4 right-4 z-50 flex items-center space-x-2">
+    <button id="langZh" class="lang-btn lang-btn-active">中文</button>
+    <button id="langEn" class="lang-btn lang-btn-inactive">English</button>
+  </div>
+
   <!-- 导航栏 -->
-  <header class="sticky top-0 z-50 bg-dark/95 backdrop-blur-sm shadow-md transition-all duration-300" id="navbar">
+  <header class="sticky top-0 z-40 bg-dark/95 backdrop-blur-sm shadow-md transition-all duration-300" id="navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-2">
         <i class="fa fa-download text-gradient text-2xl"></i>
         <h1 class="text-xl font-bold text-gradient" data-i18n="title">OpenWrt 固件下载</h1>
       </div>
-      <!-- 语言切换按钮 -->
+      <!-- 移除原语言按钮，保留导航链接 -->
       <div class="flex items-center space-x-4">
-        <button id="langToggle" class="flex items-center space-x-1 bg-dark-medium hover:bg-accent/20 text-primary hover:text-accent px-3 py-1.5 rounded-md transition-custom">
-          <span data-i18n="langBtn">语言</span>
-          <i class="fa fa-language"></i>
-        </button>
         <nav class="hidden md:flex items-center space-x-6">
           <a href="#downloads" class="text-primary font-medium hover:text-accent transition-custom" data-i18n="nav.download">下载中心</a>
           <a href="https://github.com/coolsnowwolf/lede.git" target="_blank" class="text-secondary hover:text-accent transition-custom github-link" data-i18n="nav.project">项目主页</a>
@@ -198,6 +210,7 @@
           <ul class="space-y-2 text-secondary">
             <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.clash">openclash</span></li>
             <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.passwall">passwall</span></li>
+            <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.helloworld">helloworld</span></li>
             <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.reboot">定时重启</span></li>
             <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.kms">KMS服务器</span></li>
             <li class="flex items-center"><i class="fa fa-check text-accent mr-2"></i><span data-i18n="features.plugin.timeCtrl">上网时间控制</span></li>
@@ -237,16 +250,17 @@
       <p class="text-center text-secondary mb-12 max-w-2xl mx-auto" data-i18n="download.desc">选择适合您需求的固件版本，所有版本均经过自动化构建和基本测试</p>
       
       <div class="max-w-4xl mx-auto">
-        <!-- 下载标签页 -->
-        <div class="border-b border-dark-medium mb-6">
-          <div class="flex flex-wrap">
-            <button class="download-tab py-3 px-6 font-medium text-accent border-b-2 border-accent" data-tab="clash">
-              <i class="fa fa-shield mr-2"></i> <span data-i18n="download.clash">OpenClash 版</span>
-            </button>
-            <button class="download-tab py-3 px-6 font-medium text-secondary hover:text-accent" data-tab="passwall">
-              <i class="fa fa-road mr-2"></i> <span data-i18n="download.passwall">PassWall 版</span>
-            </button>
-          </div>
+        <!-- 下载标签页 - 增加Helloworld选项 -->
+        <div class="border-b border-dark-medium mb-6 flex flex-wrap">
+          <button class="download-tab py-3 px-6 font-medium text-accent border-b-2 border-accent" data-tab="clash">
+            <i class="fa fa-shield mr-2"></i> <span data-i18n="download.clash">OpenClash 版</span>
+          </button>
+          <button class="download-tab py-3 px-6 font-medium text-secondary hover:text-accent" data-tab="passwall">
+            <i class="fa fa-road mr-2"></i> <span data-i18n="download.passwall">PassWall 版</span>
+          </button>
+          <button class="download-tab py-3 px-6 font-medium text-secondary hover:text-accent" data-tab="helloworld">
+            <i class="fa fa-globe mr-2"></i> <span data-i18n="download.helloworld">HelloWorld 版</span>
+          </button>
         </div>
         
         <!-- OpenClash 版本下载 -->
@@ -338,6 +352,51 @@
             </div>
           </div>
         </div>
+        
+        <!-- 新增 HelloWorld 版本下载 -->
+        <div class="download-content hidden" id="helloworld-content">
+          <div class="bg-dark-light rounded-xl shadow-md overflow-hidden border-gradient">
+            <div class="p-6 border-b border-dark-medium">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-semibold text-primary" data-i18n="download.helloworldTitle">OpenWrt-x86_64-HelloWorld 最新版</h3>
+                   <div class="mt-2">
+                    <span class="version-badge build-date" data-i18n="currentVersion"></span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <a href="https://github.com/game760/openwrt/releases/download/helloworld/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="button-gradient hover:opacity-90 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.downloadBtn">主用下载</span>
+                  </a>
+                  <a href="https://gh-proxy.com/https://github.com/game760/openwrt/releases/download/helloworld/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" target="_blank" class="bg-dark-medium hover:bg-accent/30 text-white font-medium py-2 px-6 rounded-lg transition-custom flex items-center github-link group">
+                    <i class="fa fa-download mr-2 group-hover:translate-x-[-2px] transition-transform"></i> 
+                    <span data-i18n="download.backupBtn">备用下载</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <div class="p-6">
+              <h4 class="font-medium mb-3 text-primary" data-i18n="download.components">包含组件:</h4>
+              <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">HelloWorld</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.reboot">定时重启</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.kms">KMS服务器</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full" data-i18n="features.plugin.timeCtrl">上网时间控制</span>
+                <span class="bg-accent/10 text-primary text-sm px-3 py-1 rounded-full">IPv6</span>
+              </div>
+              
+              <div class="bg-dark p-4 rounded-lg border border-dark-medium">
+                <h4 class="font-medium mb-2 flex items-center" data-i18n="download.note">
+                  <i class="fa fa-info-circle text-accent mr-2"></i> 版本说明
+                </h4>
+                <p class="text-sm text-secondary" data-i18n="download.helloworldNote">此版本集成 HelloWorld 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。</p>
+                <p class="text-xs text-secondary mt-2" data-i18n="download.fileTip">提示：国外地区使用主用地址下载；中国地区使用备用地址下载。</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -364,7 +423,7 @@
             </li>
             <li class="flex items-start">
               <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
-              <span data-i18n="guide.step1.item2">下载适合的固件版本（OpenClash 或 PassWall）</span>
+              <span data-i18n="guide.step1.item2">下载适合的固件版本（OpenClash、PassWall 或 HelloWorld）</span>
             </li>
             <li class="flex items-start">
               <i class="fa fa-check-circle text-accent mt-1 mr-2"></i>
@@ -458,11 +517,10 @@
   </footer>
 
   <script>
-    // 多语言配置
+    // 多语言配置 - 增加Helloworld相关翻译
     const i18n = {
       zh: {
         title: "OpenWrt 固件下载",
-        langBtn: "English",
         currentVersion: "当前版本: ",
         nav: {
           download: "下载中心",
@@ -483,6 +541,7 @@
             title: "常用插件集成",
             clash: "openclash",
             passwall: "passwall",
+            helloworld: "helloworld",
             reboot: "定时重启",
             kms: "KMS服务器",
             timeCtrl: "上网时间控制"
@@ -501,15 +560,18 @@
           desc: "选择适合您需求的固件版本，所有版本均经过自动化构建和基本测试",
           clash: "OpenClash 版",
           passwall: "PassWall 版",
+          helloworld: "HelloWorld 版",
           clashTitle: "OpenWrt-x86_64-OpenClash 最新版",
           passwallTitle: "OpenWrt-x86_64-PassWall 最新版",
+          helloworldTitle: "OpenWrt-x86_64-HelloWorld 最新版",
           downloadBtn: "主用下载",
           backupBtn: "备用下载",
           components: "包含组件:",
           note: "版本说明",
           fileTip: "国外地区使用主用地址下载；中国地区使用备用地址下载。",
           clashNote: "此版本集成 OpenClash 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，支持 IPv6。",
-          passwallNote: "此版本集成 PassWall 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。"
+          passwallNote: "此版本集成 PassWall 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。",
+          helloworldNote: "此版本集成 HelloWorld 插件，适合需要科学上网功能的用户。固件基于最新 LEDE 源码构建，包含常用网络工具和实用组件，适合 x86_64 架构设备。"
         },
         guide: {
           title: "安装指南",
@@ -517,7 +579,7 @@
           step1: {
             title: "准备工作",
             item1: "确保您的设备是 x86_64 架构的兼容设备",
-            item2: "下载适合的固件版本（OpenClash 或 PassWall）",
+            item2: "下载适合的固件版本（OpenClash、PassWall 或 HelloWorld）",
             item3: "准备一个至少 1GB 的 USB 闪存盘或其他存储介质"
           },
           step2: {
@@ -542,7 +604,6 @@
       },
       en: {
         title: "OpenWrt Firmware Download",
-        langBtn: "Chinese",
         currentVersion: "Current Version: ",
         nav: {
           download: "Download Center",
@@ -563,6 +624,7 @@
             title: "Common Plugins Integrated",
             clash: "openclash",
             passwall: "passwall",
+            helloworld: "helloworld",
             reboot: "Scheduled Reboot",
             kms: "KMS Server",
             timeCtrl: "Internet Time Control"
@@ -581,15 +643,18 @@
           desc: "Select the firmware version that suits your needs. All versions have undergone automated builds and basic testing.",
           clash: "OpenClash Version",
           passwall: "PassWall Version",
+          helloworld: "HelloWorld Version",
           clashTitle: "OpenWrt-x86_64-OpenClash Latest Version",
           passwallTitle: "OpenWrt-x86_64-PassWall Latest Version",
+          helloworldTitle: "OpenWrt-x86_64-HelloWorld Latest Version",
           downloadBtn: "Main Download",
           backupBtn: "Backup Download",
           components: "Included Components:",
           note: "Version Note",
           fileTip: "Note: Use the primary address for downloading in overseas regions; use the backup address for downloading in China.",
           clashNote: "This version integrates the OpenClash plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, supporting IPv6.",
-          passwallNote: "This version integrates the PassWall plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, suitable for x86_64 architecture devices."
+          passwallNote: "This version integrates the PassWall plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, suitable for x86_64 architecture devices.",
+          helloworldNote: "This version integrates the HelloWorld plugin, suitable for users who need internet access features. The firmware is built from the latest LEDE source code, including common network tools and practical components, suitable for x86_64 architecture devices."
         },
         guide: {
           title: "Installation Guide",
@@ -597,7 +662,7 @@
           step1: {
             title: "Preparation",
             item1: "Ensure your device is a compatible x86_64 architecture device",
-            item2: "Download the suitable firmware version (OpenClash or PassWall)",
+            item2: "Download the suitable firmware version (OpenClash, PassWall or HelloWorld)",
             item3: "Prepare a USB flash drive or other storage medium of at least 1GB"
           },
           step2: {
@@ -634,23 +699,40 @@
     });
 
     // 语言切换功能
-    const langToggle = document.getElementById('langToggle');
+    const langZh = document.getElementById('langZh');
+    const langEn = document.getElementById('langEn');
     const savedLang = localStorage.getItem('openwrtLang') || 'zh';
     
     // 初始化语言
     updatePageLang(savedLang);
     
     // 语言切换事件
-    langToggle.addEventListener('click', () => {
-      const currentLang = document.body.getAttribute('data-lang');
-      const newLang = currentLang === 'zh' ? 'en' : 'zh';
-      localStorage.setItem('openwrtLang', newLang);
-      updatePageLang(newLang);
+    langZh.addEventListener('click', () => {
+      localStorage.setItem('openwrtLang', 'zh');
+      updatePageLang('zh');
+    });
+    
+    langEn.addEventListener('click', () => {
+      localStorage.setItem('openwrtLang', 'en');
+      updatePageLang('en');
     });
     
     // 更新页面语言
     function updatePageLang(lang) {
       document.body.setAttribute('data-lang', lang);
+      
+      // 更新语言按钮状态
+      if (lang === 'zh') {
+        langZh.classList.remove('lang-btn-inactive');
+        langZh.classList.add('lang-btn-active');
+        langEn.classList.remove('lang-btn-active');
+        langEn.classList.add('lang-btn-inactive');
+      } else {
+        langZh.classList.remove('lang-btn-active');
+        langZh.classList.add('lang-btn-inactive');
+        langEn.classList.remove('lang-btn-inactive');
+        langEn.classList.add('lang-btn-active');
+      }
       
       // 更新所有带data-i18n属性的元素
       document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -702,7 +784,7 @@
       });
     });
 
-    // 下载标签页切换
+    // 下载标签页切换 - 增加Helloworld标签处理
     const downloadTabs = document.querySelectorAll('.download-tab');
     const downloadContents = document.querySelectorAll('.download-content');
     
