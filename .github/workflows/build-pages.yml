@@ -26,7 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-     - name: Inject GitHub Token into HTML
+      - name: Inject GitHub Token into HTML
         run: |
           sed -i "s/{{API_GITHUB_TOKEN}}/${{ secrets.API_GITHUB_TOKEN }}/g" status.html
           
