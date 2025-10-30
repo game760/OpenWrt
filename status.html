@@ -369,31 +369,32 @@
             });
         }
 
-        // 拉取所有仓库的工作流ID
-        async function fetchAllWorkflowIds() {
-            updateStatusIndicator(getI18n(currentLang, 'initializing'), 'text-pending');
-            try {
-                const fetchPromises = config.workflows.map(workflow => fetchSingleRepoWorkflowIds(workflow));
-                await Promise.all(fetchPromises);
+ // 拉取所有仓库的工作流ID
+async function fetchAllWorkflowStatuses() {
+    updateStatusIndicator(getI18n(currentLang, 'updating'), 'text-pending');
+    try {
+        const fetchPromises = config.workflows.map(workflow => fetchSingleWorkflowStatus(workflow));
+        await Promise.all(fetchPromises);
 
-                const missingWfs = config.workflows.filter(workflow => {
-                    const key = `${workflow.owner}-${workflow.repo}-${workflow.file}`;
-                    return !workflowIds[key];
-                });
-                if (missingWfs.length > 0) {
-                    const missingText = missingWfs.map(wf => `${wf.name[currentLang]}`).join(', ');
-                    console.warn(`未找到以下工作流ID：${missingText}`);
-                    updateStatusIndicator(getI18n(currentLang, 'partialInitFailed'), 'text-failure');
-                } else {
-                    updateStatusIndicator(getI18n(currentLang, 'initCompleted'), 'text-success');
-                }
+        const now = new Date();
+        document.getElementById('last-update').textContent = 
+            `${getI18n(currentLang, 'lastUpdate').split('：')[0]}：${now.toLocaleString()}`;
+        updateStatusIndicator(getI18n(currentLang, 'updateCompleted'), 'text-success');
 
-                fetchAllWorkflowStatuses();
-            } catch (error) {
-                console.error('工作流ID拉取失败：', error);
-                updateStatusIndicator(getI18n(currentLang, 'initFailed'), 'text-failure');
-            }
-        }
+        // 新增：数据更新完成后，延迟刷新页面
+        setTimeout(() => {
+            updateStatusIndicator(
+                currentLang === 'zh' ? '数据已更新，页面刷新中...' : 'Data updated, refreshing page...', 
+                'text-primary'
+            );
+            window.location.reload(); // 触发页面刷新
+        }, 500); // 500ms延迟，确保用户看到“更新完成”提示
+
+    } catch (error) {
+        console.error('状态更新失败：', error);
+        updateStatusIndicator(getI18n(currentLang, 'updateFailed'), 'text-failure');
+    }
+}
 
         // 拉取单个仓库的工作流列表
         async function fetchSingleRepoWorkflowIds(workflow) {
