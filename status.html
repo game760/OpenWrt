@@ -24,6 +24,18 @@
                         'bounce-slow': 'bounce 2s infinite',
                         'pulse-slow': 'pulse 3s infinite',
                         'spin-slow': 'spin 2s linear infinite',
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
                     }
                 }
             }
@@ -49,6 +61,15 @@
                 color: white;
             }
             .icon-dynamic {
+                transition: all 0.3s ease;
+            }
+            .updating {
+                transition: all 0.3s ease;
+            }
+            .history-item {
+                transition: all 0.3s ease;
+            }
+            .status-legend {
                 transition: all 0.3s ease;
             }
         }
@@ -77,10 +98,59 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* 状态说明面板过渡效果 */
+        #status-legend-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+        #status-legend-content:not(.hidden) {
+            max-height: 300px;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- 状态说明面板 -->
+        <div class="mb-6 status-legend">
+            <button id="toggle-legend" class="flex items-center text-primary hover:text-primary/80 font-medium">
+                <i class="fa fa-info-circle mr-2"></i>
+                <span data-i18n="statusLegend">状态说明</span>
+                <i id="legend-icon" class="fa fa-chevron-down ml-2 text-xs transition-transform duration-300"></i>
+            </button>
+            <div id="status-legend-content" class="hidden mt-3 bg-white p-4 rounded-lg shadow-md text-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="flex items-center">
+                        <i class="fa fa-clock-o text-pending animate-pulse-slow mr-2"></i>
+                        <span data-i18n="status.queued">排队中</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fa fa-refresh text-pending animate-spin-slow mr-2"></i>
+                        <span data-i18n="status.in_progress">构建中</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fa fa-check-circle text-success animate-bounce-slow mr-2"></i>
+                        <span data-i18n="status.completed.success">成功</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fa fa-times-circle text-failure animate-bounce-slow mr-2"></i>
+                        <span data-i18n="status.completed.failure">失败</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fa fa-ban text-cancelled animate-pulse-slow mr-2"></i>
+                        <span data-i18n="status.completed.cancelled">已取消</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fa fa-exclamation-triangle text-failure animate-bounce-slow mr-2"></i>
+                        <span data-i18n="status.error">获取数据失败</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <header class="mb-10 text-center">
             <div class="flex justify-end mb-4">
                 <div class="flex space-x-2">
@@ -100,7 +170,7 @@
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8" id="workflow-container">
             <!-- 工作流状态卡片将通过JS动态生成 -->
         </div>
 
@@ -114,7 +184,7 @@
         </div>
 
         <footer class="text-center text-gray-500 text-sm py-4" data-i18n="footer">
-            <p>数据来源: GitHub API | 刷新间隔: 180秒</p>
+            <p>数据来源: GitHub API | 刷新间隔: 60秒</p>
         </footer>
     </div>
 
@@ -137,6 +207,7 @@
                 historyTitle: "构建历史记录（最近3天）",
                 noHistory: "暂无历史记录",
                 footer: "数据来源: GitHub API | 刷新间隔: 60秒",
+                statusLegend: "状态说明",
                 status: {
                     queued: "排队中",
                     in_progress: "构建中",
@@ -174,6 +245,7 @@
                 historyTitle: "Build History (Last 3 Days)",
                 noHistory: "No history records",
                 footer: "Data source: GitHub API | Refresh interval: 60s",
+                statusLegend: "Status Legend",
                 status: {
                     queued: "Queued",
                     in_progress: "In progress",
@@ -203,7 +275,7 @@
         // 配置信息
         const config = {
             token: "{{API_GITHUB_TOKEN}}",
-            interval: 180000, // 3分钟刷新一次
+            interval: 60000, // 1分钟刷新一次
             workflows: [
                 { name: { zh: 'HelloWorld', en: 'HelloWorld' }, file: 'Build LEDE helloworld.yml', owner: 'game760', repo: 'openwrt' },
                 { name: { zh: 'OpenClash', en: 'OpenClash' }, file: 'Build LEDE openclash.yml', owner: 'game760', repo: 'openwrt' },
@@ -241,15 +313,49 @@
             document.getElementById('lang-zh').addEventListener('click', () => setLanguage('zh'));
             document.getElementById('lang-en').addEventListener('click', () => setLanguage('en'));
             
+            // 绑定状态说明面板切换事件
+            document.getElementById('toggle-legend').addEventListener('click', toggleStatusLegend);
+            
             createWorkflowCards();
             
             if (!config.token) {
-                alert('请先在代码中配置有效GitHub个人访问令牌(PAT)，需包含repo和workflow权限\nPlease configure a valid GitHub Personal Access Token (PAT) in the code first, which needs to include repo and workflow permissions');
+                // 无Token时显示友好提示
+                const container = document.getElementById('workflow-container');
+                container.innerHTML = `
+                    <div class="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
+                        <h3 class="font-semibold flex items-center">
+                            <i class="fa fa-exclamation-circle mr-2"></i>请配置GitHub Token
+                        </h3>
+                        <p class="mt-2 text-sm">
+                            1. 前往GitHub -> 设置 -> 开发者设置 -> 个人访问令牌（PAT）<br>
+                            2. 生成令牌时勾选 "repo" 和 "workflow" 权限<br>
+                            3. 将令牌填入代码中 config.token 的位置（替换 "{{API_GITHUB_TOKEN}}"）
+                        </p>
+                    </div>
+                `;
             } else {
                 fetchAllWorkflowIds();
                 setInterval(fetchAllWorkflowStatuses, config.interval);
             }
         });
+
+        // 切换状态说明面板显示/隐藏
+        function toggleStatusLegend() {
+            const content = document.getElementById('status-legend-content');
+            const icon = document.getElementById('legend-icon');
+            
+            content.classList.toggle('hidden');
+            if (!content.classList.contains('hidden')) {
+                // 显示时添加动画
+                content.classList.add('animate-fade-in');
+                setTimeout(() => content.classList.remove('animate-fade-in'), 500);
+                // 旋转图标
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                // 隐藏时恢复图标
+                icon.style.transform = 'rotate(0)';
+            }
+        }
 
         // 设置语言
         function setLanguage(lang) {
@@ -261,10 +367,16 @@
             document.getElementById('lang-zh').classList.toggle('active', lang === 'zh');
             document.getElementById('lang-en').classList.toggle('active', lang === 'en');
             
-            // 更新静态文本
+            // 更新所有翻译文本（包括状态说明面板）
             document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                el.textContent = getI18n(currentLang, key);
+                el.classList.add('opacity-0');
+                setTimeout(() => {
+                    const key = el.getAttribute('data-i18n');
+                    el.textContent = getI18n(currentLang, key);
+                    el.classList.remove('opacity-0');
+                    el.classList.add('animate-fade-in');
+                    setTimeout(() => el.classList.remove('animate-fade-in'), 500);
+                }, 100);
             });
             
             // 更新工作流卡片
@@ -298,10 +410,10 @@
 
         // 创建工作流卡片
         function createWorkflowCards() {
-            const container = document.querySelector('.grid');
+            const container = document.getElementById('workflow-container');
             config.workflows.forEach(workflow => {
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg shadow p-6 card-hover';
+                card.className = 'bg-white rounded-lg shadow p-6 card-hover animate-fade-in';
                 card.id = `card-${workflow.owner}-${workflow.repo}-${workflow.file}`;
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-4">
@@ -333,12 +445,24 @@
         function updateAllWorkflowCards() {
             config.workflows.forEach(workflow => {
                 // 更新工作流名称
-                document.querySelector(`.workflow-name[data-workflow="${workflow.file}"]`)
-                    .textContent = workflow.name[currentLang];
+                const nameElem = document.querySelector(`.workflow-name[data-workflow="${workflow.file}"]`);
+                nameElem.classList.add('opacity-0');
+                setTimeout(() => {
+                    nameElem.textContent = workflow.name[currentLang];
+                    nameElem.classList.remove('opacity-0');
+                    nameElem.classList.add('animate-fade-in');
+                    setTimeout(() => nameElem.classList.remove('animate-fade-in'), 500);
+                }, 100);
                 
                 // 更新查看详情链接文本
-                document.getElementById(`link-${workflow.owner}-${workflow.repo}-${workflow.file}`)
-                    .innerHTML = `<i class="fa fa-external-link mr-1"></i> ${getI18n(currentLang, 'viewDetails')}`;
+                const linkElem = document.getElementById(`link-${workflow.owner}-${workflow.repo}-${workflow.file}`);
+                linkElem.classList.add('opacity-0');
+                setTimeout(() => {
+                    linkElem.innerHTML = `<i class="fa fa-external-link mr-1"></i> ${getI18n(currentLang, 'viewDetails')}`;
+                    linkElem.classList.remove('opacity-0');
+                    linkElem.classList.add('animate-fade-in');
+                    setTimeout(() => linkElem.classList.remove('animate-fade-in'), 500);
+                }, 100);
                 
                 // 如果已有状态数据，更新状态文本和动态图标
                 const statusElem = document.getElementById(`status-${workflow.owner}-${workflow.repo}-${workflow.file}`);
@@ -354,7 +478,15 @@
                         statusText = getI18n(currentLang, `status.${currentStatus}`);
                         iconInfo = statusIcons[currentStatus] || statusIcons.unknown;
                     }
-                    statusElem.textContent = statusText;
+                    
+                    statusElem.classList.add('opacity-0');
+                    setTimeout(() => {
+                        statusElem.textContent = statusText;
+                        statusElem.classList.remove('opacity-0');
+                        statusElem.classList.add('animate-fade-in');
+                        setTimeout(() => statusElem.classList.remove('animate-fade-in'), 500);
+                    }, 100);
+                    
                     // 更新动态图标
                     const iconElem = document.getElementById(`icon-${workflow.owner}-${workflow.repo}-${workflow.file}`);
                     updateIconElement(iconElem, iconInfo);
@@ -364,7 +496,13 @@
                 const timeElem = document.getElementById(`time-${workflow.owner}-${workflow.repo}-${workflow.file}`);
                 const timestamp = timeElem.getAttribute('data-timestamp');
                 if (timestamp) {
-                    timeElem.textContent = formatRelativeTime(new Date(timestamp));
+                    timeElem.classList.add('opacity-0');
+                    setTimeout(() => {
+                        timeElem.textContent = formatRelativeTime(new Date(timestamp));
+                        timeElem.classList.remove('opacity-0');
+                        timeElem.classList.add('animate-fade-in');
+                        setTimeout(() => timeElem.classList.remove('animate-fade-in'), 500);
+                    }, 100);
                 }
             });
         }
@@ -423,19 +561,54 @@
 
         // 拉取所有工作流状态
         async function fetchAllWorkflowStatuses() {
+            // 显示更新动画
+            showUpdateAnimation();
+            
             updateStatusIndicator(getI18n(currentLang, 'updating'), 'text-pending');
             try {
                 const fetchPromises = config.workflows.map(workflow => fetchSingleWorkflowStatus(workflow));
                 await Promise.all(fetchPromises);
 
                 const now = new Date();
-                document.getElementById('last-update').textContent = 
-                    `${getI18n(currentLang, 'lastUpdate').split('：')[0]}：${now.toLocaleString()}`;
+                const lastUpdateElem = document.getElementById('last-update');
+                lastUpdateElem.classList.add('opacity-0');
+                setTimeout(() => {
+                    lastUpdateElem.textContent = `${getI18n(currentLang, 'lastUpdate').split('：')[0]}：${now.toLocaleString()}`;
+                    lastUpdateElem.classList.remove('opacity-0');
+                    lastUpdateElem.classList.add('animate-fade-in');
+                    setTimeout(() => lastUpdateElem.classList.remove('animate-fade-in'), 500);
+                }, 100);
+                
                 updateStatusIndicator(getI18n(currentLang, 'updateCompleted'), 'text-success');
             } catch (error) {
                 console.error('状态更新失败：', error);
                 updateStatusIndicator(getI18n(currentLang, 'updateFailed'), 'text-failure');
+            } finally {
+                // 隐藏更新动画
+                hideUpdateAnimation();
             }
+        }
+
+        // 显示更新动画
+        function showUpdateAnimation() {
+            const cards = document.querySelectorAll('#workflow-container > div');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('opacity-70', 'scale-[0.98]');
+                }, index * 50);
+            });
+        }
+
+        // 隐藏更新动画
+        function hideUpdateAnimation() {
+            const cards = document.querySelectorAll('#workflow-container > div');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.remove('opacity-70', 'scale-[0.98]');
+                    card.classList.add('animate-fade-in');
+                    setTimeout(() => card.classList.remove('animate-fade-in'), 300);
+                }, index * 50);
+            });
         }
 
         // 拉取单个工作流的最新状态
@@ -458,6 +631,22 @@
                         }
                     }
                 );
+
+                // 处理API速率限制
+                if (response.status === 403) {
+                    const errorData = await response.json();
+                    if (errorData.message.includes('API rate limit exceeded')) {
+                        console.error(`工作流${workflow.name[currentLang]}：GitHub API速率限制已耗尽`);
+                        // 显示速率限制提示
+                        updateWorkflowCard(workflow, { 
+                            status: 'error', 
+                            conclusion: null, 
+                            updated_at: new Date().toISOString(),
+                            errorMsg: 'API速率限制耗尽'
+                        });
+                        return;
+                    }
+                }
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
@@ -502,7 +691,12 @@
                 statusElem.textContent = getI18n(currentLang, 'status.no_runs');
             } else if (runData.status === 'error' || runData.status === 'unknown') {
                 statusInfo = statusIcons.error;
-                statusElem.textContent = getI18n(currentLang, 'status.error');
+                // 显示速率限制错误
+                if (runData.errorMsg === 'API速率限制耗尽') {
+                    statusElem.textContent = getI18n(currentLang, 'status.error') + '（API速率限制）';
+                } else {
+                    statusElem.textContent = getI18n(currentLang, 'status.error');
+                }
             } else {
                 // 处理时间 - 使用构建实际完成时间
                 if (runData.updated_at) {
@@ -526,13 +720,35 @@
                 cardElem.classList.add('border-l-4', `border-${statusInfo.color}`);
             }
 
-            // 更新动态图标
-            updateIconElement(iconElem, statusInfo);
+            // 添加状态更新动画
+            statusElem.classList.add('opacity-0');
+            timeElem.classList.add('opacity-0');
+            iconElem.classList.add('opacity-0');
             
-            // 更新其他UI元素
-            statusElem.className = `text-${statusInfo.color}`;
-            timeElem.textContent = timeText;
-            linkElem.href = link;
+            setTimeout(() => {
+                // 更新动态图标
+                updateIconElement(iconElem, statusInfo);
+                
+                // 更新其他UI元素
+                statusElem.className = `text-${statusInfo.color}`;
+                timeElem.textContent = timeText;
+                linkElem.href = link;
+                
+                // 显示淡入动画
+                statusElem.classList.remove('opacity-0');
+                timeElem.classList.remove('opacity-0');
+                iconElem.classList.remove('opacity-0');
+                
+                statusElem.classList.add('animate-fade-in');
+                timeElem.classList.add('animate-fade-in');
+                iconElem.classList.add('animate-fade-in');
+                
+                setTimeout(() => {
+                    statusElem.classList.remove('animate-fade-in');
+                    timeElem.classList.remove('animate-fade-in');
+                    iconElem.classList.remove('animate-fade-in');
+                }, 500);
+            }, 200);
         }
 
         // 更新图标元素（应用动态效果）
@@ -556,16 +772,14 @@
                     icon: statusIcons.completed[conclusion].icon,
                     color: statusIcons.completed[conclusion].color,
                     animation: statusIcons.completed[conclusion].animation,
-                    text: getI18n(currentLang, `status.completed.${conclusion}`),
-                    key: `status.completed.${conclusion}`
+                    key: `status.completed.${conclusion}` // 仅存储状态键
                 };
             } else {
                 statusInfo = {
                     icon: statusIcons[runData.status].icon,
                     color: statusIcons[runData.status].color,
                     animation: statusIcons[runData.status].animation,
-                    text: getI18n(currentLang, `status.${runData.status}`),
-                    key: `status.${runData.status}`
+                    key: `status.${runData.status}` // 仅存储状态键
                 };
             }
 
@@ -585,8 +799,7 @@
             const historyItem = {
                 timestamp: buildTime,
                 workflow: workflow.name,
-                status: statusInfo.text,
-                statusKey: statusInfo.key,
+                statusKey: statusInfo.key, // 仅存储键
                 color: statusInfo.color,
                 icon: statusInfo.icon,
                 animation: statusInfo.animation
@@ -635,9 +848,11 @@
             }
 
             container.innerHTML = '';
-            history.forEach(item => {
+            history.forEach((item, index) => {
                 const entry = document.createElement('div');
-                entry.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0';
+                // 通过item.statusKey获取当前语言的状态文本
+                const statusText = getI18n(currentLang, item.statusKey);
+                entry.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0 history-item opacity-0';
                 entry.innerHTML = `
                     <div class="flex items-center space-x-3 mb-1 sm:mb-0">
                         <i class="fa ${item.icon} text-${item.color} ${item.animation}"></i>
@@ -646,20 +861,37 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span class="text-${item.color} text-sm">${getI18n(currentLang, item.statusKey)}</span>
+                        <span class="text-${item.color} text-sm">${statusText}</span>
                         <span class="text-gray-500 text-xs">${item.timestamp.toLocaleString()}</span>
                     </div>
                 `;
                 container.appendChild(entry);
+                
+                // 添加延迟动画效果
+                setTimeout(() => {
+                    entry.classList.remove('opacity-0');
+                    entry.classList.add('animate-slide-up');
+                    setTimeout(() => entry.classList.remove('animate-slide-up'), 300);
+                }, index * 50);
             });
         }
 
         // 更新状态指示器
         function updateStatusIndicator(text, className) {
             const indicator = document.getElementById('status-indicator');
-            indicator.className = '';
-            indicator.classList.add(...className.split(' '));
-            indicator.textContent = text;
+            indicator.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                indicator.className = '';
+                indicator.classList.add(...className.split(' '));
+                indicator.textContent = text;
+                indicator.classList.remove('opacity-0');
+                indicator.classList.add('animate-fade-in');
+                
+                setTimeout(() => {
+                    indicator.classList.remove('animate-fade-in');
+                }, 500);
+            }, 100);
         }
 
         // 格式化相对时间（支持多语言）
