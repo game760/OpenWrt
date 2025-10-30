@@ -20,6 +20,11 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', 'sans-serif'],
                     },
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-slow': 'pulse 3s infinite',
+                        'spin-slow': 'spin 2s linear infinite',
+                    }
                 }
             }
         }
@@ -43,6 +48,9 @@
                 background-color: #2c3e50;
                 color: white;
             }
+            .icon-dynamic {
+                transition: all 0.3s ease;
+            }
         }
 
         @keyframes pulse {
@@ -51,6 +59,22 @@
             }
             50% {
                 opacity: 0.5;
+            }
+        }
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
             }
         }
     </style>
@@ -82,7 +106,7 @@
 
         <div class="bg-white rounded-lg shadow p-4 mb-8">
             <h2 class="text-lg font-semibold mb-3 flex items-center" data-i18n="historyTitle">
-                <i class="fa fa-history text-primary mr-2"></i>构建历史记录
+                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（最近3天）
             </h2>
             <div id="history-container" class="space-y-2 max-h-60 overflow-y-auto">
                 <p class="text-gray-500 italic text-center py-4" data-i18n="noHistory">暂无历史记录</p>
@@ -110,7 +134,7 @@
                 updateCompleted: "更新完成",
                 updateFailed: "更新失败",
                 viewDetails: "查看详情",
-                historyTitle: "构建历史记录",
+                historyTitle: "构建历史记录（最近3天）",
                 noHistory: "暂无历史记录",
                 footer: "数据来源: GitHub API | 刷新间隔: 60秒",
                 status: {
@@ -147,7 +171,7 @@
                 updateCompleted: "Update completed",
                 updateFailed: "Update failed",
                 viewDetails: "View details",
-                historyTitle: "Build History",
+                historyTitle: "Build History (Last 3 Days)",
                 noHistory: "No history records",
                 footer: "Data source: GitHub API | Refresh interval: 60s",
                 status: {
@@ -179,26 +203,31 @@
         // 配置信息
         const config = {
             token: "{{API_GITHUB_TOKEN}}",
-            interval: 180000,
+            interval: 180000, // 3分钟刷新一次
             workflows: [
                 { name: { zh: 'HelloWorld', en: 'HelloWorld' }, file: 'Build LEDE helloworld.yml', owner: 'game760', repo: 'openwrt' },
                 { name: { zh: 'OpenClash', en: 'OpenClash' }, file: 'Build LEDE openclash.yml', owner: 'game760', repo: 'openwrt' },
                 { name: { zh: 'PassWall', en: 'PassWall' }, file: 'Build LEDE passwall.yml', owner: 'game760', repo: 'openwrt' }, 
                 { name: { zh: 'index', en: 'index' }, file: 'build-pages.yml', owner: 'game760', repo: 'openwrt' }
-            ]
+            ],
+            historyDaysLimit: 3, // 历史记录时间限制：3天
+            historyHoursLimit: 3 * 24 // 转换为小时：72小时
         };
 
-        // 状态图标映射
+        // 动态状态图标映射（带动画效果）
         const statusIcons = {
-            queued: { icon: 'fa-clock-o', color: 'pending' },
-            in_progress: { icon: 'fa-spinner fa-spin', color: 'pending' },
+            queued: { icon: 'fa-clock-o', color: 'pending', animation: 'animate-pulse-slow' },
+            in_progress: { icon: 'fa-refresh', color: 'pending', animation: 'animate-spin-slow' },
             completed: {
-                success: { icon: 'fa-check-circle', color: 'success' },
-                failure: { icon: 'fa-times-circle', color: 'failure' },
-                cancelled: { icon: 'fa-ban', color: 'cancelled' },
-                neutral: { icon: 'fa-minus-circle', color: 'gray-500' },
-                default: { icon: 'fa-question-circle', color: 'gray-400' }
-            }
+                success: { icon: 'fa-check-circle', color: 'success', animation: 'animate-bounce-slow' },
+                failure: { icon: 'fa-times-circle', color: 'failure', animation: 'animate-bounce-slow' },
+                cancelled: { icon: 'fa-ban', color: 'cancelled', animation: 'animate-pulse-slow' },
+                neutral: { icon: 'fa-minus-circle', color: 'gray-500', animation: '' },
+                default: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
+            },
+            no_runs: { icon: 'fa-file-text-o', color: 'gray-400', animation: '' },
+            error: { icon: 'fa-exclamation-triangle', color: 'failure', animation: 'animate-bounce-slow' },
+            unknown: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
         };
 
         // 存储工作流ID映射
@@ -267,7 +296,7 @@
             return value;
         }
 
-        // 创建工作流卡片（移除仓库标识和工作流文件路径）
+        // 创建工作流卡片
         function createWorkflowCards() {
             const container = document.querySelector('.grid');
             config.workflows.forEach(workflow => {
@@ -281,7 +310,7 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <i class="fa fa-question-circle text-2xl text-gray-400" 
+                            <i class="fa fa-question-circle text-2xl text-gray-400 icon-dynamic" 
                                id="icon-${workflow.owner}-${workflow.repo}-${workflow.file}"></i>
                             <span class="text-gray-600" 
                                   id="status-${workflow.owner}-${workflow.repo}-${workflow.file}">${getI18n(currentLang, 'waiting')}</span>
@@ -311,19 +340,24 @@
                 document.getElementById(`link-${workflow.owner}-${workflow.repo}-${workflow.file}`)
                     .innerHTML = `<i class="fa fa-external-link mr-1"></i> ${getI18n(currentLang, 'viewDetails')}`;
                 
-                // 如果已有状态数据，更新状态文本
+                // 如果已有状态数据，更新状态文本和动态图标
                 const statusElem = document.getElementById(`status-${workflow.owner}-${workflow.repo}-${workflow.file}`);
                 const currentStatus = statusElem.getAttribute('data-status');
                 const currentConclusion = statusElem.getAttribute('data-conclusion');
                 
                 if (currentStatus) {
-                    let statusText;
+                    let statusText, iconInfo;
                     if (currentStatus === 'completed' && currentConclusion) {
                         statusText = getI18n(currentLang, `status.completed.${currentConclusion}`);
+                        iconInfo = statusIcons.completed[currentConclusion] || statusIcons.completed.default;
                     } else {
                         statusText = getI18n(currentLang, `status.${currentStatus}`);
+                        iconInfo = statusIcons[currentStatus] || statusIcons.unknown;
                     }
                     statusElem.textContent = statusText;
+                    // 更新动态图标
+                    const iconElem = document.getElementById(`icon-${workflow.owner}-${workflow.repo}-${workflow.file}`);
+                    updateIconElement(iconElem, iconInfo);
                 }
                 
                 // 更新时间文本
@@ -455,7 +489,7 @@
             statusElem.setAttribute('data-conclusion', runData.conclusion || '');
             
             // 重置样式
-            iconElem.className = '';
+            iconElem.className = 'fa text-2xl icon-dynamic';
             statusElem.className = '';
             cardElem.classList.remove('border-l-4', 'border-pending', 'border-success', 'border-failure', 'border-cancelled');
 
@@ -464,17 +498,11 @@
             let link = `https://github.com/${workflow.owner}/${workflow.repo}/actions/workflows/${workflow.file}`;
 
             if (runData.status === 'no_runs') {
-                statusInfo = { 
-                    icon: 'fa-file-text-o', 
-                    color: 'gray-400', 
-                    text: getI18n(currentLang, 'status.no_runs')
-                };
+                statusInfo = statusIcons.no_runs;
+                statusElem.textContent = getI18n(currentLang, 'status.no_runs');
             } else if (runData.status === 'error' || runData.status === 'unknown') {
-                statusInfo = { 
-                    icon: 'fa-exclamation-triangle', 
-                    color: 'failure', 
-                    text: getI18n(currentLang, 'status.error')
-                };
+                statusInfo = statusIcons.error;
+                statusElem.textContent = getI18n(currentLang, 'status.error');
             } else {
                 // 处理时间 - 使用构建实际完成时间
                 if (runData.updated_at) {
@@ -488,32 +516,35 @@
                 // 处理状态
                 if (runData.status === 'completed') {
                     const conclusion = runData.conclusion || 'default';
-                    statusInfo = {
-                        icon: statusIcons.completed[conclusion].icon,
-                        color: statusIcons.completed[conclusion].color,
-                        text: getI18n(currentLang, `status.completed.${conclusion}`)
-                    };
+                    statusInfo = statusIcons.completed[conclusion] || statusIcons.completed.default;
+                    statusElem.textContent = getI18n(currentLang, `status.completed.${conclusion}`);
                 } else {
-                    statusInfo = {
-                        icon: statusIcons[runData.status].icon,
-                        color: statusIcons[runData.status].color,
-                        text: getI18n(currentLang, `status.${runData.status}`)
-                    };
+                    statusInfo = statusIcons[runData.status] || statusIcons.unknown;
+                    statusElem.textContent = getI18n(currentLang, `status.${runData.status}`);
                 }
                 
                 cardElem.classList.add('border-l-4', `border-${statusInfo.color}`);
             }
 
-            // 更新UI
-            iconElem.className = `fa ${statusInfo.icon} text-2xl text-${statusInfo.color}`;
-            if (runData.status === 'in_progress') iconElem.classList.add('status-pulse');
+            // 更新动态图标
+            updateIconElement(iconElem, statusInfo);
+            
+            // 更新其他UI元素
             statusElem.className = `text-${statusInfo.color}`;
-            statusElem.textContent = statusInfo.text;
             timeElem.textContent = timeText;
             linkElem.href = link;
         }
 
-        // 添加到历史记录（移除仓库标识）
+        // 更新图标元素（应用动态效果）
+        function updateIconElement(elem, iconInfo) {
+            // 清除所有动画类
+            elem.classList.remove('animate-bounce-slow', 'animate-pulse-slow', 'animate-spin-slow');
+            
+            // 添加新的图标和样式
+            elem.className = `fa ${iconInfo.icon} text-2xl text-${iconInfo.color} icon-dynamic ${iconInfo.animation}`;
+        }
+
+        // 添加到历史记录（仅保留最近3天）
         function addToHistory(workflow, runData) {
             if (!runData.status || runData.status === 'no_runs' || runData.status === 'unknown') return;
 
@@ -524,6 +555,7 @@
                 statusInfo = {
                     icon: statusIcons.completed[conclusion].icon,
                     color: statusIcons.completed[conclusion].color,
+                    animation: statusIcons.completed[conclusion].animation,
                     text: getI18n(currentLang, `status.completed.${conclusion}`),
                     key: `status.completed.${conclusion}`
                 };
@@ -531,6 +563,7 @@
                 statusInfo = {
                     icon: statusIcons[runData.status].icon,
                     color: statusIcons[runData.status].color,
+                    animation: statusIcons[runData.status].animation,
                     text: getI18n(currentLang, `status.${runData.status}`),
                     key: `status.${runData.status}`
                 };
@@ -539,24 +572,39 @@
             // 使用构建实际完成时间
             const buildTime = runData.updated_at ? new Date(runData.updated_at) : new Date();
             
+            // 检查是否在3天内
+            const now = new Date();
+            const timeDiff = now - buildTime;
+            const hoursDiff = timeDiff / (1000 * 60 * 60);
+            
+            // 只添加3天内的记录
+            if (hoursDiff > config.historyHoursLimit) {
+                return;
+            }
+            
             const historyItem = {
                 timestamp: buildTime,
                 workflow: workflow.name,
                 status: statusInfo.text,
                 statusKey: statusInfo.key,
                 color: statusInfo.color,
-                icon: statusInfo.icon
+                icon: statusInfo.icon,
+                animation: statusInfo.animation
             };
 
             // 去重逻辑
             const lastItem = history.find(item => 
-                item.workflow.zh === historyItem.workflow.zh
+                item.workflow.zh === historyItem.workflow.zh &&
+                item.statusKey === historyItem.statusKey &&
+                Math.abs(item.timestamp - historyItem.timestamp) < 60000 // 1分钟内的相同状态视为重复
             );
             
-            if (!(lastItem && lastItem.statusKey === historyItem.statusKey)) {
+            if (!lastItem) {
                 history.unshift(historyItem);
-                // 按时间排序
+                // 按时间排序并过滤超过3天的记录
                 history.sort((a, b) => b.timestamp - a.timestamp);
+                filterOldHistory();
+                // 限制最多显示12条
                 if (history.length > 12) {
                     history.pop();
                 }
@@ -564,7 +612,20 @@
             }
         }
 
-        // 渲染历史记录（移除仓库标识）
+        // 过滤超过3天的历史记录
+        function filterOldHistory() {
+            const now = new Date();
+            const cutoffTime = now.getTime() - (config.historyHoursLimit * 60 * 60 * 1000);
+            
+            // 保留3天内的记录
+            const recentHistory = history.filter(item => item.timestamp.getTime() >= cutoffTime);
+            
+            // 更新历史记录数组
+            history.length = 0;
+            history.push(...recentHistory);
+        }
+
+        // 渲染历史记录
         function renderHistory() {
             const container = document.getElementById('history-container');
             
@@ -579,7 +640,7 @@
                 entry.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0';
                 entry.innerHTML = `
                     <div class="flex items-center space-x-3 mb-1 sm:mb-0">
-                        <i class="fa ${item.icon} text-${item.color}"></i>
+                        <i class="fa ${item.icon} text-${item.color} ${item.animation}"></i>
                         <div>
                             <span class="font-medium">${item.workflow[currentLang]}</span>
                         </div>
