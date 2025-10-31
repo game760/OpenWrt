@@ -761,47 +761,51 @@
 
         // 添加到历史记录（仅保留最近12条）
         function addToHistory(workflow, runData) {
-            if (!runData.status || runData.status === 'no_runs' || runData.status === 'unknown') return;
+            // 完善状态判断条件，确保有效状态才会被记录
+            if (!runData.status || 
+                !runData.id ||  // 确保有唯一ID
+                runData.status === 'no_runs' || 
+                runData.status === 'unknown' ||
+                !runData.updated_at) {
+                return;
+            }
 
             // 获取状态信息
             let statusInfo;
             if (runData.status === 'completed') {
                 const conclusion = runData.conclusion || 'default';
                 statusInfo = {
-                    icon: statusIcons.completed[conclusion].icon,
-                    color: statusIcons.completed[conclusion].color,
-                    animation: statusIcons.completed[conclusion].animation,
-                    key: `status.completed.${conclusion}` // 仅存储状态键
+                    icon: statusIcons.completed[conclusion]?.icon || statusIcons.unknown.icon,
+                    color: statusIcons.completed[conclusion]?.color || statusIcons.unknown.color,
+                    animation: statusIcons.completed[conclusion]?.animation || '',
+                    key: `status.completed.${conclusion}`
                 };
             } else {
                 statusInfo = {
-                    icon: statusIcons[runData.status].icon,
-                    color: statusIcons[runData.status].color,
-                    animation: statusIcons[runData.status].animation,
-                    key: `status.${runData.status}` // 仅存储状态键
+                    icon: statusIcons[runData.status]?.icon || statusIcons.unknown.icon,
+                    color: statusIcons[runData.status]?.color || statusIcons.unknown.color,
+                    animation: statusIcons[runData.status]?.animation || '',
+                    key: `status.${runData.status}`
                 };
             }
 
             // 使用构建实际完成时间
-            const buildTime = runData.updated_at ? new Date(runData.updated_at) : new Date();
+            const buildTime = new Date(runData.updated_at);
             
             const historyItem = {
+                id: runData.id, // 增加唯一ID用于更精准的去重
                 timestamp: buildTime,
                 workflow: workflow.name,
-                statusKey: statusInfo.key, // 仅存储键
+                statusKey: statusInfo.key,
                 color: statusInfo.color,
                 icon: statusInfo.icon,
                 animation: statusInfo.animation
             };
 
-            // 去重逻辑
-            const lastItem = history.find(item => 
-                item.workflow.zh === historyItem.workflow.zh &&
-                item.statusKey === historyItem.statusKey &&
-                Math.abs(item.timestamp - historyItem.timestamp) < 60000 // 1分钟内的相同状态视为重复
-            );
+            // 优化去重逻辑：只排除完全相同的构建记录（通过runData.id）
+            const duplicate = history.some(item => item.id === runData.id);
             
-            if (!lastItem) {
+            if (!duplicate) {
                 history.unshift(historyItem);
                 // 按时间排序
                 history.sort((a, b) => b.timestamp - a.timestamp);
