@@ -692,7 +692,7 @@
                     const latestRun = data.workflow_runs[0];
                     updateWorkflowCard(workflow, latestRun);
                     
-                    // 将所有获取到的记录添加到历史
+                    // 将所有获取到的记录添加到历史（API返回的已经是按时间倒序排列的）
                     data.workflow_runs.forEach(run => addToHistory(workflow, run));
                 } else {
                     updateWorkflowCard(workflow, { status: 'no_runs', conclusion: null, updated_at: null });
@@ -790,7 +790,7 @@
             }, 200);
         }
 
-        // 添加到历史记录（按工作流分组，每组最多3条）
+        // 添加到历史记录（按工作流分组，每组最多3条，确保最新的在最上方）
         function addToHistory(workflow, runData) {
             // 1. 过滤无效记录（无状态、无ID、无时间的记录不保存）
             if (!runData.status || !runData.id || !runData.updated_at) {
@@ -841,7 +841,11 @@
             }
 
             // 6. 添加新记录并按时间倒序排序（最新的在前）
-            groupedHistory[workflowKey].unshift(historyItem);
+            groupedHistory[workflowKey].push(historyItem);
+            
+            // 关键改进：强制按时间戳倒序排序，确保最新的记录在最上方
+            groupedHistory[workflowKey].sort((a, b) => b.timestamp - a.timestamp);
+            
             // 仅保留最近maxRecordsPerWorkflow条（删除超出部分）
             if (groupedHistory[workflowKey].length > maxRecordsPerWorkflow) {
                 groupedHistory[workflowKey].splice(maxRecordsPerWorkflow);
@@ -851,7 +855,7 @@
             renderHistory();
         }
 
-        // 渲染历史记录（按工作流分组，每组最多3条）
+        // 渲染历史记录（按工作流分组，每组最多3条，最新的在最上方）
         function renderHistory() {
             const container = document.getElementById('history-container');
             container.innerHTML = ''; // 清空原有内容
@@ -859,8 +863,9 @@
             // 1. 遍历所有配置的工作流，按组渲染
             config.workflows.forEach((workflow, workflowIndex) => {
                 const workflowKey = workflow.id;
-                const workflowRecords = groupedHistory[workflowKey] || []; // 该工作流的记录（无则为空数组）
-
+                // 确保记录数组已按时间倒序排序
+                const workflowRecords = groupedHistory[workflowKey] ? [...groupedHistory[workflowKey]] : [];
+                
                 // 2. 创建工作流分组容器
                 const groupContainer = document.createElement('div');
                 groupContainer.className = 'mb-6 last:mb-0 opacity-0'; // 初始透明，用于动画
@@ -884,7 +889,7 @@
                         <p class="text-gray-500 text-sm italic">${getI18n(currentLang, 'noHistoryForWorkflow')}</p>
                     `;
                 } else {
-                    // 有记录时，遍历渲染每条记录
+                    // 有记录时，遍历渲染每条记录（已经是按时间倒序）
                     workflowRecords.forEach((record, recordIndex) => {
                         const statusText = getI18n(currentLang, record.statusKey);
                         const entry = document.createElement('div');
@@ -898,7 +903,7 @@
                         `;
                         recordsContainer.appendChild(entry);
 
-                        // 记录项的淡入动画（延迟触发，更自然）
+                        // 记录项的淡入动画（最新的先显示）
                         setTimeout(() => {
                             entry.classList.remove('opacity-0');
                             entry.classList.add('animate-slide-up');
