@@ -176,7 +176,7 @@
 
         <div class="bg-white rounded-lg shadow p-4 mb-8">
             <h2 class="text-lg font-semibold mb-3 flex items-center" data-i18n="historyTitle">
-                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（每个任务最近3条）
+                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（每个任务最近<span id="history-count-display">3</span>条）
             </h2>
             <div id="history-container" class="space-y-2 max-h-[600px] overflow-y-auto p-2">
                 <!-- 历史记录将按工作流分组显示 -->
@@ -204,7 +204,7 @@
                 updateCompleted: "更新完成",
                 updateFailed: "更新失败",
                 viewDetails: "查看详情",
-                historyTitle: "构建历史记录（每个任务最近3条）",
+                historyTitle: "构建历史记录（每个任务最近{0}条）",
                 noHistory: "暂无任何构建记录",
                 noHistoryForWorkflow: "暂无该工作流的构建记录",
                 footer: "数据来源: GitHub API | 刷新间隔: 60秒",
@@ -243,7 +243,7 @@
                 updateCompleted: "Update completed",
                 updateFailed: "Update failed",
                 viewDetails: "View details",
-                historyTitle: "Build History (Last 3 per workflow)",
+                historyTitle: "Build History (Last {0} per workflow)",
                 noHistory: "No build records available",
                 noHistoryForWorkflow: "No build records for this workflow",
                 footer: "Data source: GitHub API | Refresh interval: 60s",
@@ -274,10 +274,11 @@
         // 当前语言
         let currentLang = 'zh';
 
-        // 配置信息
+        // 配置信息 - 增加历史记录数量设置
         const config = {
             token: "{{API_GITHUB_TOKEN}}",
             interval: 60000, // 1分钟刷新一次
+            historyRecordCount: 3, // 每个工作流显示的历史记录数量
             workflows: [
                 { 
                     id: "helloworld", 
@@ -310,25 +311,6 @@
             ]
         };
 
-        // 每个工作流最多保留3条记录
-        const maxRecordsPerWorkflow = 3;
-
-        // 动态状态图标映射（带动画效果）
-        const statusIcons = {
-            queued: { icon: 'fa-clock-o', color: 'pending', animation: 'animate-pulse-slow' },
-            in_progress: { icon: 'fa-refresh', color: 'pending', animation: 'animate-spin-slow' },
-            completed: {
-                success: { icon: 'fa-check-circle', color: 'success', animation: 'animate-bounce-slow' },
-                failure: { icon: 'fa-times-circle', color: 'failure', animation: 'animate-bounce-slow' },
-                cancelled: { icon: 'fa-ban', color: 'cancelled', animation: 'animate-pulse-slow' },
-                neutral: { icon: 'fa-minus-circle', color: 'gray-500', animation: '' },
-                default: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
-            },
-            no_runs: { icon: 'fa-file-text-o', color: 'gray-400', animation: '' },
-            error: { icon: 'fa-exclamation-triangle', color: 'failure', animation: 'animate-bounce-slow' },
-            unknown: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
-        };
-
         // 存储工作流ID映射
         const workflowIds = {};
         // 按工作流分组存储历史记录（键：工作流唯一标识，值：该工作流的记录数组）
@@ -344,6 +326,8 @@
             document.getElementById('toggle-legend').addEventListener('click', toggleStatusLegend);
             
             createWorkflowCards();
+            // 初始化历史记录数量显示
+            updateHistoryCountDisplay();
             
             if (!config.token) {
                 // 无Token时显示友好提示
@@ -365,6 +349,16 @@
                 setInterval(fetchAllWorkflowStatuses, config.interval);
             }
         });
+
+        // 更新历史记录数量显示
+        function updateHistoryCountDisplay() {
+            const countElement = document.getElementById('history-count-display');
+            countElement.textContent = config.historyRecordCount;
+            
+            // 更新标题翻译
+            const historyTitle = document.querySelector('[data-i18n="historyTitle"]');
+            historyTitle.textContent = getI18n(currentLang, 'historyTitle', [config.historyRecordCount]);
+        }
 
         // 切换状态说明面板显示/隐藏
         function toggleStatusLegend() {
@@ -399,7 +393,12 @@
                 el.classList.add('opacity-0');
                 setTimeout(() => {
                     const key = el.getAttribute('data-i18n');
-                    el.textContent = getI18n(currentLang, key);
+                    // 处理历史标题的特殊参数
+                    if (key === 'historyTitle') {
+                        el.textContent = getI18n(currentLang, key, [config.historyRecordCount]);
+                    } else {
+                        el.textContent = getI18n(currentLang, key);
+                    }
                     el.classList.remove('opacity-0');
                     el.classList.add('animate-fade-in');
                     setTimeout(() => el.classList.remove('animate-fade-in'), 500);
@@ -658,8 +657,9 @@
             }
 
             try {
+                // 根据需要显示的历史记录数量拉取对应数量的记录
                 const response = await fetch(
-                    `https://api.github.com/repos/${workflow.owner}/${workflow.repo}/actions/workflows/${wfId}/runs?per_page=3`, // 获取最近3条记录
+                    `https://api.github.com/repos/${workflow.owner}/${workflow.repo}/actions/workflows/${wfId}/runs?per_page=${config.historyRecordCount}`,
                     {
                         headers: {
                             'Accept': 'application/vnd.github.v3+json',
@@ -790,7 +790,23 @@
             }, 200);
         }
 
-        // 添加到历史记录（按工作流分组，每组最多3条，确保最新的在最上方）
+        // 动态状态图标映射（带动画效果）
+        const statusIcons = {
+            queued: { icon: 'fa-clock-o', color: 'pending', animation: 'animate-pulse-slow' },
+            in_progress: { icon: 'fa-refresh', color: 'pending', animation: 'animate-spin-slow' },
+            completed: {
+                success: { icon: 'fa-check-circle', color: 'success', animation: 'animate-bounce-slow' },
+                failure: { icon: 'fa-times-circle', color: 'failure', animation: 'animate-bounce-slow' },
+                cancelled: { icon: 'fa-ban', color: 'cancelled', animation: 'animate-pulse-slow' },
+                neutral: { icon: 'fa-minus-circle', color: 'gray-500', animation: '' },
+                default: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
+            },
+            no_runs: { icon: 'fa-file-text-o', color: 'gray-400', animation: '' },
+            error: { icon: 'fa-exclamation-triangle', color: 'failure', animation: 'animate-bounce-slow' },
+            unknown: { icon: 'fa-question-circle', color: 'gray-400', animation: '' }
+        };
+
+        // 添加到历史记录（按工作流分组，每组最多显示配置的数量，确保最新的在最上方）
         function addToHistory(workflow, runData) {
             // 1. 过滤无效记录（无状态、无ID、无时间的记录不保存）
             if (!runData.status || !runData.id || !runData.updated_at) {
@@ -827,7 +843,7 @@
                 animation: statusInfo.animation
             };
 
-            // 4. 按工作流ID分组存储（确保每组最多3条）
+            // 4. 按工作流ID分组存储（确保每组最多显示配置的数量）
             const workflowKey = workflow.id; // 用工作流唯一ID作为分组键
             // 初始化该工作流的记录数组（若未存在）
             if (!groupedHistory[workflowKey]) {
@@ -843,19 +859,19 @@
             // 6. 添加新记录并按时间倒序排序（最新的在前）
             groupedHistory[workflowKey].push(historyItem);
             
-            // 关键改进：强制按时间戳倒序排序，确保最新的记录在最上方
+            // 强制按时间戳倒序排序，确保最新的记录在最上方
             groupedHistory[workflowKey].sort((a, b) => b.timestamp - a.timestamp);
             
-            // 仅保留最近maxRecordsPerWorkflow条（删除超出部分）
-            if (groupedHistory[workflowKey].length > maxRecordsPerWorkflow) {
-                groupedHistory[workflowKey].splice(maxRecordsPerWorkflow);
+            // 仅保留配置数量的记录（删除超出部分）
+            if (groupedHistory[workflowKey].length > config.historyRecordCount) {
+                groupedHistory[workflowKey].splice(config.historyRecordCount);
             }
 
             // 7. 重新渲染历史记录
             renderHistory();
         }
 
-        // 渲染历史记录（按工作流分组，每组最多3条，最新的在最上方）
+        // 渲染历史记录（按工作流分组，每组最多显示配置的数量，最新的在最上方）
         function renderHistory() {
             const container = document.getElementById('history-container');
             container.innerHTML = ''; // 清空原有内容
