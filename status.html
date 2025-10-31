@@ -176,10 +176,10 @@
 
         <div class="bg-white rounded-lg shadow p-4 mb-8">
             <h2 class="text-lg font-semibold mb-3 flex items-center" data-i18n="historyTitle">
-                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（最近12条）
+                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（每个任务最近3条）
             </h2>
-            <div id="history-container" class="space-y-2 max-h-60 overflow-y-auto">
-                <p class="text-gray-500 italic text-center py-4" data-i18n="noHistory">暂无历史记录</p>
+            <div id="history-container" class="space-y-2 max-h-[600px] overflow-y-auto p-2">
+                <!-- 历史记录将按工作流分组显示 -->
             </div>
         </div>
 
@@ -204,8 +204,9 @@
                 updateCompleted: "更新完成",
                 updateFailed: "更新失败",
                 viewDetails: "查看详情",
-                historyTitle: "构建历史记录（最近12条）",
-                noHistory: "暂无历史记录",
+                historyTitle: "构建历史记录（每个任务最近3条）",
+                noHistory: "暂无任何构建记录",
+                noHistoryForWorkflow: "暂无该工作流的构建记录",
                 footer: "数据来源: GitHub API | 刷新间隔: 60秒",
                 statusLegend: "状态说明",
                 status: {
@@ -242,8 +243,9 @@
                 updateCompleted: "Update completed",
                 updateFailed: "Update failed",
                 viewDetails: "View details",
-                historyTitle: "Build History (Last 12 Entries)",
-                noHistory: "No history records",
+                historyTitle: "Build History (Last 3 per workflow)",
+                noHistory: "No build records available",
+                noHistoryForWorkflow: "No build records for this workflow",
                 footer: "Data source: GitHub API | Refresh interval: 60s",
                 statusLegend: "Status Legend",
                 status: {
@@ -277,13 +279,39 @@
             token: "{{API_GITHUB_TOKEN}}",
             interval: 60000, // 1分钟刷新一次
             workflows: [
-                { name: { zh: 'HelloWorld', en: 'HelloWorld' }, file: 'Build LEDE helloworld.yml', owner: 'game760', repo: 'openwrt' },
-                { name: { zh: 'OpenClash', en: 'OpenClash' }, file: 'Build LEDE openclash.yml', owner: 'game760', repo: 'openwrt' },
-                { name: { zh: 'PassWall', en: 'PassWall' }, file: 'Build LEDE passwall.yml', owner: 'game760', repo: 'openwrt' }, 
-                { name: { zh: 'index', en: 'index' }, file: 'build-pages.yml', owner: 'game760', repo: 'openwrt' }
-            ],
-            historyMaxCount: 12 // 历史记录最大显示条数
+                { 
+                    id: "helloworld", 
+                    name: { zh: 'HelloWorld', en: 'HelloWorld' }, 
+                    file: 'Build LEDE helloworld.yml', 
+                    owner: 'game760', 
+                    repo: 'openwrt' 
+                },
+                { 
+                    id: "openclash", 
+                    name: { zh: 'OpenClash', en: 'OpenClash' }, 
+                    file: 'Build LEDE openclash.yml', 
+                    owner: 'game760', 
+                    repo: 'openwrt' 
+                },
+                { 
+                    id: "passwall", 
+                    name: { zh: 'PassWall', en: 'PassWall' }, 
+                    file: 'Build LEDE passwall.yml', 
+                    owner: 'game760', 
+                    repo: 'openwrt' 
+                }, 
+                { 
+                    id: "index", 
+                    name: { zh: 'index', en: 'index' }, 
+                    file: 'build-pages.yml', 
+                    owner: 'game760', 
+                    repo: 'openwrt' 
+                }
+            ]
         };
+
+        // 每个工作流最多保留3条记录
+        const maxRecordsPerWorkflow = 3;
 
         // 动态状态图标映射（带动画效果）
         const statusIcons = {
@@ -303,8 +331,8 @@
 
         // 存储工作流ID映射
         const workflowIds = {};
-        // 存储历史记录
-        const history = [];
+        // 按工作流分组存储历史记录（键：工作流唯一标识，值：该工作流的记录数组）
+        const groupedHistory = {};
 
         // 初始化页面
         document.addEventListener('DOMContentLoaded', () => {
@@ -631,7 +659,7 @@
 
             try {
                 const response = await fetch(
-                    `https://api.github.com/repos/${workflow.owner}/${workflow.repo}/actions/workflows/${wfId}/runs?per_page=1`,
+                    `https://api.github.com/repos/${workflow.owner}/${workflow.repo}/actions/workflows/${wfId}/runs?per_page=3`, // 获取最近3条记录
                     {
                         headers: {
                             'Accept': 'application/vnd.github.v3+json',
@@ -660,9 +688,12 @@
                 const data = await response.json();
 
                 if (data.workflow_runs && data.workflow_runs.length > 0) {
-                    const run = data.workflow_runs[0];
-                    updateWorkflowCard(workflow, run);
-                    addToHistory(workflow, run);
+                    // 更新卡片显示最新一条记录
+                    const latestRun = data.workflow_runs[0];
+                    updateWorkflowCard(workflow, latestRun);
+                    
+                    // 将所有获取到的记录添加到历史
+                    data.workflow_runs.forEach(run => addToHistory(workflow, run));
                 } else {
                     updateWorkflowCard(workflow, { status: 'no_runs', conclusion: null, updated_at: null });
                 }
@@ -759,18 +790,14 @@
             }, 200);
         }
 
-        // 添加到历史记录（仅保留最近12条）
+        // 添加到历史记录（按工作流分组，每组最多3条）
         function addToHistory(workflow, runData) {
-            // 完善状态判断条件，确保有效状态才会被记录
-            if (!runData.status || 
-                !runData.id ||  // 确保有唯一ID
-                runData.status === 'no_runs' || 
-                runData.status === 'unknown' ||
-                !runData.updated_at) {
+            // 1. 过滤无效记录（无状态、无ID、无时间的记录不保存）
+            if (!runData.status || !runData.id || !runData.updated_at) {
                 return;
             }
 
-            // 获取状态信息
+            // 2. 获取当前工作流的状态图标、颜色等信息
             let statusInfo;
             if (runData.status === 'completed') {
                 const conclusion = runData.conclusion || 'default';
@@ -789,69 +816,103 @@
                 };
             }
 
-            // 使用构建实际完成时间
+            // 3. 构造历史记录项
             const buildTime = new Date(runData.updated_at);
-            
             const historyItem = {
-                id: runData.id, // 增加唯一ID用于更精准的去重
+                id: runData.id, // 构建记录唯一ID（用于去重）
                 timestamp: buildTime,
-                workflow: workflow.name,
                 statusKey: statusInfo.key,
                 color: statusInfo.color,
                 icon: statusInfo.icon,
                 animation: statusInfo.animation
             };
 
-            // 优化去重逻辑：只排除完全相同的构建记录（通过runData.id）
-            const duplicate = history.some(item => item.id === runData.id);
-            
-            if (!duplicate) {
-                history.unshift(historyItem);
-                // 按时间排序
-                history.sort((a, b) => b.timestamp - a.timestamp);
-                // 限制最多显示12条
-                if (history.length > config.historyMaxCount) {
-                    history.splice(config.historyMaxCount);
-                }
-                renderHistory();
+            // 4. 按工作流ID分组存储（确保每组最多3条）
+            const workflowKey = workflow.id; // 用工作流唯一ID作为分组键
+            // 初始化该工作流的记录数组（若未存在）
+            if (!groupedHistory[workflowKey]) {
+                groupedHistory[workflowKey] = [];
             }
-        }
 
-        // 渲染历史记录
-        function renderHistory() {
-            const container = document.getElementById('history-container');
-            
-            if (history.length === 0) {
-                container.innerHTML = `<p class="text-gray-500 italic text-center py-4" data-i18n="noHistory">${getI18n(currentLang, 'noHistory')}</p>`;
+            // 5. 去重（避免重复添加同一条构建记录）
+            const isDuplicate = groupedHistory[workflowKey].some(item => item.id === runData.id);
+            if (isDuplicate) {
                 return;
             }
 
-            container.innerHTML = '';
-            history.forEach((item, index) => {
-                const entry = document.createElement('div');
-                // 通过item.statusKey获取当前语言的状态文本
-                const statusText = getI18n(currentLang, item.statusKey);
-                entry.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0 history-item opacity-0';
-                entry.innerHTML = `
-                    <div class="flex items-center space-x-3 mb-1 sm:mb-0">
-                        <i class="fa ${item.icon} text-${item.color} ${item.animation}"></i>
-                        <div>
-                            <span class="font-medium">${item.workflow[currentLang]}</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-${item.color} text-sm">${statusText}</span>
-                        <span class="text-gray-500 text-xs">${item.timestamp.toLocaleString()}</span>
+            // 6. 添加新记录并按时间倒序排序（最新的在前）
+            groupedHistory[workflowKey].unshift(historyItem);
+            // 仅保留最近maxRecordsPerWorkflow条（删除超出部分）
+            if (groupedHistory[workflowKey].length > maxRecordsPerWorkflow) {
+                groupedHistory[workflowKey].splice(maxRecordsPerWorkflow);
+            }
+
+            // 7. 重新渲染历史记录
+            renderHistory();
+        }
+
+        // 渲染历史记录（按工作流分组，每组最多3条）
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = ''; // 清空原有内容
+
+            // 1. 遍历所有配置的工作流，按组渲染
+            config.workflows.forEach((workflow, workflowIndex) => {
+                const workflowKey = workflow.id;
+                const workflowRecords = groupedHistory[workflowKey] || []; // 该工作流的记录（无则为空数组）
+
+                // 2. 创建工作流分组容器
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'mb-6 last:mb-0 opacity-0'; // 初始透明，用于动画
+                // 添加分组标题（工作流名称）
+                groupContainer.innerHTML = `
+                    <h3 class="text-base font-semibold mb-2 text-primary flex items-center">
+                        <i class="fa fa-caret-right mr-2"></i>
+                        ${workflow.name[currentLang]}
+                    </h3>
+                    <div class="pl-4 space-y-2" id="records-${workflowKey}">
+                        <!-- 该工作流的记录将动态插入这里 -->
                     </div>
                 `;
-                container.appendChild(entry);
-                
-                // 添加延迟动画效果
+                container.appendChild(groupContainer);
+
+                // 3. 获取当前工作流的记录容器，插入记录或提示
+                const recordsContainer = groupContainer.querySelector(`#records-${workflowKey}`);
+                if (workflowRecords.length === 0) {
+                    // 无记录时显示提示
+                    recordsContainer.innerHTML = `
+                        <p class="text-gray-500 text-sm italic">${getI18n(currentLang, 'noHistoryForWorkflow')}</p>
+                    `;
+                } else {
+                    // 有记录时，遍历渲染每条记录
+                    workflowRecords.forEach((record, recordIndex) => {
+                        const statusText = getI18n(currentLang, record.statusKey);
+                        const entry = document.createElement('div');
+                        entry.className = 'flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0 history-item opacity-0';
+                        entry.innerHTML = `
+                            <div class="flex items-center space-x-2">
+                                <i class="fa ${record.icon} text-${record.color} ${record.animation} text-sm"></i>
+                                <span class="text-${record.color} text-sm">${statusText}</span>
+                            </div>
+                            <span class="text-gray-500 text-xs">${record.timestamp.toLocaleString()}</span>
+                        `;
+                        recordsContainer.appendChild(entry);
+
+                        // 记录项的淡入动画（延迟触发，更自然）
+                        setTimeout(() => {
+                            entry.classList.remove('opacity-0');
+                            entry.classList.add('animate-slide-up');
+                            setTimeout(() => entry.classList.remove('animate-slide-up'), 300);
+                        }, workflowIndex * 100 + recordIndex * 50);
+                    });
+                }
+
+                // 工作流分组的淡入动画
                 setTimeout(() => {
-                    entry.classList.remove('opacity-0');
-                    entry.classList.add('animate-slide-up');
-                    setTimeout(() => entry.classList.remove('animate-slide-up'), 300);
-                }, index * 50);
+                    groupContainer.classList.remove('opacity-0');
+                    groupContainer.classList.add('animate-fade-in');
+                    setTimeout(() => groupContainer.classList.remove('animate-fade-in'), 300);
+                }, workflowIndex * 100);
             });
         }
 
