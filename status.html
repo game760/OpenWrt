@@ -176,7 +176,7 @@
 
         <div class="bg-white rounded-lg shadow p-4 mb-8">
             <h2 class="text-lg font-semibold mb-3 flex items-center" data-i18n="historyTitle">
-                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（最近3天）
+                <i class="fa fa-history text-primary mr-2"></i>构建历史记录（最近12条）
             </h2>
             <div id="history-container" class="space-y-2 max-h-60 overflow-y-auto">
                 <p class="text-gray-500 italic text-center py-4" data-i18n="noHistory">暂无历史记录</p>
@@ -204,7 +204,7 @@
                 updateCompleted: "更新完成",
                 updateFailed: "更新失败",
                 viewDetails: "查看详情",
-                historyTitle: "构建历史记录（最近3天）",
+                historyTitle: "构建历史记录（最近12条）",
                 noHistory: "暂无历史记录",
                 footer: "数据来源: GitHub API | 刷新间隔: 60秒",
                 statusLegend: "状态说明",
@@ -242,7 +242,7 @@
                 updateCompleted: "Update completed",
                 updateFailed: "Update failed",
                 viewDetails: "View details",
-                historyTitle: "Build History (Last 3 Days)",
+                historyTitle: "Build History (Last 12 Entries)",
                 noHistory: "No history records",
                 footer: "Data source: GitHub API | Refresh interval: 60s",
                 statusLegend: "Status Legend",
@@ -282,8 +282,7 @@
                 { name: { zh: 'PassWall', en: 'PassWall' }, file: 'Build LEDE passwall.yml', owner: 'game760', repo: 'openwrt' }, 
                 { name: { zh: 'index', en: 'index' }, file: 'build-pages.yml', owner: 'game760', repo: 'openwrt' }
             ],
-            historyDaysLimit: 3, // 历史记录时间限制：3天
-            historyHoursLimit: 3 * 24 // 转换为小时：72小时
+            historyMaxCount: 12 // 历史记录最大显示条数
         };
 
         // 动态状态图标映射（带动画效果）
@@ -505,6 +504,15 @@
                     }, 100);
                 }
             });
+        }
+
+        // 更新图标元素（应用动态效果）
+        function updateIconElement(elem, iconInfo) {
+            // 清除所有动画类
+            elem.classList.remove('animate-bounce-slow', 'animate-pulse-slow', 'animate-spin-slow');
+            
+            // 添加新的图标和样式
+            elem.className = `fa ${iconInfo.icon} text-2xl text-${iconInfo.color} icon-dynamic ${iconInfo.animation}`;
         }
 
         // 拉取所有仓库的工作流ID
@@ -751,16 +759,7 @@
             }, 200);
         }
 
-        // 更新图标元素（应用动态效果）
-        function updateIconElement(elem, iconInfo) {
-            // 清除所有动画类
-            elem.classList.remove('animate-bounce-slow', 'animate-pulse-slow', 'animate-spin-slow');
-            
-            // 添加新的图标和样式
-            elem.className = `fa ${iconInfo.icon} text-2xl text-${iconInfo.color} icon-dynamic ${iconInfo.animation}`;
-        }
-
-        // 添加到历史记录（仅保留最近3天）
+        // 添加到历史记录（仅保留最近12条）
         function addToHistory(workflow, runData) {
             if (!runData.status || runData.status === 'no_runs' || runData.status === 'unknown') return;
 
@@ -786,16 +785,6 @@
             // 使用构建实际完成时间
             const buildTime = runData.updated_at ? new Date(runData.updated_at) : new Date();
             
-            // 检查是否在3天内
-            const now = new Date();
-            const timeDiff = now - buildTime;
-            const hoursDiff = timeDiff / (1000 * 60 * 60);
-            
-            // 只添加3天内的记录
-            if (hoursDiff > config.historyHoursLimit) {
-                return;
-            }
-            
             const historyItem = {
                 timestamp: buildTime,
                 workflow: workflow.name,
@@ -814,28 +803,14 @@
             
             if (!lastItem) {
                 history.unshift(historyItem);
-                // 按时间排序并过滤超过3天的记录
+                // 按时间排序
                 history.sort((a, b) => b.timestamp - a.timestamp);
-                filterOldHistory();
                 // 限制最多显示12条
-                if (history.length > 12) {
-                    history.pop();
+                if (history.length > config.historyMaxCount) {
+                    history.splice(config.historyMaxCount);
                 }
                 renderHistory();
             }
-        }
-
-        // 过滤超过3天的历史记录
-        function filterOldHistory() {
-            const now = new Date();
-            const cutoffTime = now.getTime() - (config.historyHoursLimit * 60 * 60 * 1000);
-            
-            // 保留3天内的记录
-            const recentHistory = history.filter(item => item.timestamp.getTime() >= cutoffTime);
-            
-            // 更新历史记录数组
-            history.length = 0;
-            history.push(...recentHistory);
         }
 
         // 渲染历史记录
