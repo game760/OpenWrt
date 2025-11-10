@@ -3,7 +3,8 @@ name: Delete_Old_Workflows
 on:
   workflow_dispatch:
   schedule:
-    - cron: 0 16 * * *
+        - cron: 0 18 * * *
+        - cron: 0 6 * * *
 
 jobs:
   Clean-Workflows:
