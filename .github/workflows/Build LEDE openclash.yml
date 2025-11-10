@@ -13,8 +13,8 @@ jobs:
     permissions:
       contents: write
     env:
-      LEDE_REPO: coolsnowwolf/lede
-      LEDE_BRANCH: master
+      LEDE_REPO: game760/lede
+      LEDE_BRANCH: main
       CONFIG_FILE: clash.config
       FEEDS_FILE: clash_feeds.conf.default
       WORK_DIR: /mnt/lede
